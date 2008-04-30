@@ -514,7 +514,7 @@ public class BDDSemiring implements Semiring {
 			e = bdd.id().andWith(s1dom.ithVar(s1));
 			BDDIterator s0itr = manager.iterator(e, s0dom);
 			
-			nexts0: while (s0itr.hasNext()) {
+			while (s0itr.hasNext()) {
 			
 				// Gets a s0 value
 				BDD f = s0itr.nextBDD();
@@ -524,10 +524,10 @@ public class BDDSemiring implements Semiring {
 				if (s0 < 0) {
 					log("\t\tArray bound violation: index %d%n", s0);
 					System.err.printf("Array bound violation: index %d%n", s0);
-					continue nexts0;
+					continue;
 				}
 				
-				// Check array bound
+				// Gets all length values wrt. to s0 and s1
 				f = e.id().andWith(s0dom.ithVar(s0));
 				BDDDomain ldom = manager.getArrayLengthDomain(s1);
 				BDDIterator lptr = manager.iterator(f, ldom);
@@ -535,27 +535,32 @@ public class BDDSemiring implements Semiring {
 					BDD g = lptr.nextBDD();
 					long l = g.scanVar(ldom).longValue();
 					g.free();
+					
+					// Check array bound
 					if (s0 >= l) {
 						log("\t\tArray bound violation: length %d, index %d%n", l, s0);
 						System.err.printf("Array bound violation: length %d, index %d%n", l, s0);
-						continue nexts0;
+						continue;
 					}
-				}
-				
-				// Gets all possible heap[s1+s0+1] wrt. s1 and s0
-				BDDDomain hdom = manager.getArrayElementDomain(s1, s0);
-				BDDIterator hitr = manager.iterator(f, hdom);
-				while (hitr.hasNext()) {
 					
-					// Gets a h value
-					BDD g = hitr.nextBDD();
-					long h = g.scanVar(hdom).longValue();
+					// Gets all possible heap[s1+s0+1] wrt. length, s1, and s0
+					g = f.id().andWith(ldom.ithVar(l));
+					BDDDomain hdom = manager.getArrayElementDomain(s1, s0);
+					BDDIterator hitr = manager.iterator(g, hdom);
+					while (hitr.hasNext()) {
+						
+						// Gets a h value
+						BDD x = hitr.nextBDD();
+						long h = x.scanVar(hdom).longValue();
+						x.free();
+						
+						d.orWith(tdom.ithVar(h)
+								.andWith(hdom.ithVar(h))
+								.andWith(ldom.ithVar(l))
+								.andWith(s1dom.ithVar(s1))
+								.andWith(s0dom.ithVar(s0)));
+					}
 					g.free();
-					
-					d.orWith(tdom.ithVar(h)
-							.andWith(hdom.ithVar(h))
-							.andWith(s1dom.ithVar(s1))
-							.andWith(s0dom.ithVar(s0)));
 				}
 				f.free();
 			}
@@ -579,14 +584,14 @@ public class BDDSemiring implements Semiring {
 	 */
 	private BDDSemiring arraystore(ExprSemiring A) {
 
-		// Gets the current value of stack pointer (sp) minus 1
+		// Gets the current value of stack pointer (sp)
 		BDDDomain spdom = manager.getStackPointerDomain();
-		int sp = bdd.scanVar(spdom).intValue() - 1;
+		int sp = bdd.scanVar(spdom).intValue();	
 		
 		// Gets the stack domains
-		BDDDomain s0dom = manager.getStackDomain(sp);
-		BDDDomain s1dom = manager.getStackDomain(sp-1);
-		BDDDomain s2dom = manager.getStackDomain(sp-2);
+		BDDDomain s0dom = manager.getStackDomain(sp - 1);
+		BDDDomain s1dom = manager.getStackDomain(sp - 2);
+		BDDDomain s2dom = manager.getStackDomain(sp - 3);
 		
 		// Gets all possible s2 values
 		BDDIterator s2itr = manager.iterator(bdd, s2dom);
@@ -603,7 +608,7 @@ public class BDDSemiring implements Semiring {
 			d = bdd.id().andWith(s2dom.ithVar(s2));
 			BDDIterator s1itr = manager.iterator(d, s1dom);
 			
-			nexts1: while (s1itr.hasNext()) {
+			while (s1itr.hasNext()) {
 				
 				// Gets a s1 value
 				BDD e = s1itr.nextBDD();
@@ -611,41 +616,42 @@ public class BDDSemiring implements Semiring {
 				e.free();
 				log("\t\ts2: %d, s1: %d%n", s2, s1);
 				
-				// Check array bound
+				// Gets all possible length values wrt. s1 and s2
 				e = d.id().andWith(s1dom.ithVar(s1));
 				BDDDomain ldom = manager.getArrayLengthDomain(s2);
 				BDDIterator lptr = manager.iterator(e, ldom);
 				while (lptr.hasNext()) {
+					
+					// Gets a length value
 					BDD f = lptr.nextBDD();
-					long l = f.scanVar(ldom).longValue();
+					int l = f.scanVar(ldom).intValue();
 					f.free();
+					
+					// Check array bound
 					if (s1 < 0 || s1 >= l) {
 						log("\t\tArray bound violation: length %d, index %d%n", l, s1);
 						System.err.printf("Array bound violation: length %d, index %d%n", l, s1);
-						continue nexts1;
+						continue;
 					}
-				}
-				
-				// Gets the heap domain at s2+s1+1
-				BDDDomain hdom = manager.getArrayElementDomain(s2, s1);
-				
-				// Gets all possible s0 wrt. s2 and s1
-				BDDIterator s0itr = manager.iterator(e, s0dom);
-				
-				while (s0itr.hasNext()) {
 					
-					// Gets a s0 value
-					BDD f = s0itr.nextBDD();
-					long s0 = f.scanVar(s0dom).longValue();
-					f.free();
-					
-					// Prunes the bdd to only for s0, s1, and s2
-					f = bdd.id().andWith(s0dom.ithVar(s0)
-							.andWith(s1dom.ithVar(s1))
-							.andWith(s2dom.ithVar(s2)));
-					
-					// Updates the heap at the pruned bdd
-					c.orWith(abstractVars(f, hdom).andWith(hdom.ithVar(s0)));
+					// Gets all possible s0 wrt. length, s1, and s2
+					f = e.id().andWith(ldom.ithVar(l));
+					BDDDomain hdom = manager.getArrayElementDomain(s2, s1);
+					BDDIterator s0itr = manager.iterator(f, s0dom);
+					while (s0itr.hasNext()) {
+						
+						// Gets a s0 value
+						BDD g = s0itr.nextBDD();
+						long s0 = g.scanVar(s0dom).longValue();
+						g.free();
+						
+						// Prunes the bdd to only for s0, length, s1, and s2
+						g = f.id().andWith(s0dom.ithVar(s0));
+						
+						// Updates the heap at the pruned bdd
+						c.orWith(abstractVars(g, hdom).andWith(hdom.ithVar(s0)));
+						g.free();
+					}
 					f.free();
 				}
 				e.free();
@@ -656,7 +662,7 @@ public class BDDSemiring implements Semiring {
 		// Updates stack
 		BDD d = abstractVars(c, spdom, s2dom, s1dom, s0dom);
 		c.free();
-		d.andWith(spdom.ithVar(sp-2));
+		d.andWith(spdom.ithVar(sp - 3));
 		return new BDDSemiring(manager, d);
 	}
 	

@@ -694,6 +694,13 @@ public class VarManager {
 		return varset;
 	}
 	
+	/**
+	 * Gets all BDD variable set without those having indices 
+	 * specified by <code>indices</code>.
+	 * 
+	 * @param indices the indices.
+	 * @return the variable set.
+	 */
 	public BDDVarSet getVarSetWithout(Set<Integer> indices) {
 		
 		BDDDomain[] d = new BDDDomain[factory.numberOfDomains() - indices.size()];
@@ -780,16 +787,22 @@ public class VarManager {
 	}
 	
 	/**
-	 * Returns the BDDDomain representing the array length 
-	 * from the heap at <code>ptr</code>.
+	 * Returns the BDDDomain representing the array length.
+	 * The array pointer is specified by <code>ptr</code>.
 	 * 
-	 * @return the BDDDomain representing the array length 
-	 * 			from the heap at <code>ptr</code>.
+	 * @return the BDDDomain representing the array length.
 	 */
 	BDDDomain getArrayLengthDomain(long ptr) {
 		return getHeapDomain(ptr + getArrayAuxSize() - 1);
 	}
 	
+	/**
+	 * Returns the BDDDomain representing the array element.
+	 * The array pointer is specified by <code>ptr</code>.
+	 * The array index is specified by <code>index</code>.
+	 * 
+	 * @return the BDDDomain representing the array element.
+	 */
 	BDDDomain getArrayElementDomain(long ptr, int index) {
 		return getHeapDomain(ptr + getArrayAuxSize() + index);
 	}
@@ -1106,6 +1119,14 @@ public class VarManager {
 		return a;
 	}
 	
+	/**
+	 * Gets the BDD iterator from the <code>bdd</code>.
+	 * The iterator contains only the variables specified by <code>dom</code>. 
+	 * 
+	 * @param bdd the BDD.
+	 * @param doms the BDD domain.
+	 * @return the BDD iterator.
+	 */
 	public BDDIterator iterator(BDD bdd, BDDDomain dom) {
 		
 		BDDVarSet varset = dom.set();
@@ -1115,9 +1136,17 @@ public class VarManager {
 		return itr;
 	}
 	
-	public BDDIterator iterator(BDD bdd, BDDDomain[] doms) {
+	/**
+	 * Gets the BDD iterator from the <code>bdd</code>.
+	 * The iterator contains only the variables specified by <code>doms</code>. 
+	 * 
+	 * @param bdd the BDD.
+	 * @param doms the BDD domains.
+	 * @return the BDD iterator.
+	 */
+	public BDDIterator iterator(BDD bdd, BDDDomain... doms) {
 		
-		// Collects var set and indices
+		// Collects var set and indices from doms
 		BDDVarSet varset = factory.emptySet();
 		Set<Integer> indices = new HashSet<Integer>((int) (1.4*doms.length));
 		for (int i = 0; i < doms.length; i++) {
