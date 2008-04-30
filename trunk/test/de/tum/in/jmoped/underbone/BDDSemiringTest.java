@@ -1,5 +1,6 @@
 package de.tum.in.jmoped.underbone;
 
+import static de.tum.in.jmoped.underbone.ExprType.ARRAYLOAD;
 import static de.tum.in.jmoped.underbone.ExprType.ARRAYSTORE;
 import static de.tum.in.jmoped.underbone.ExprType.NEWARRAY;
 import static de.tum.in.jmoped.underbone.ExprType.PUSH;
@@ -26,6 +27,11 @@ import de.tum.in.wpds.Semiring;
 
 public class BDDSemiringTest {
 	
+	/**
+	 * Starts a variable manager.
+	 * 
+	 * @return a variable manager.
+	 */
 	static VarManager init() {
 		VarManager manager =  new VarManager("cudd", 10000, 10000, 
 				3, new long[] { 8, 8, 8, 8, 8, 8, 8 }, null, 3, 3, 1, false);
@@ -73,14 +79,46 @@ public class BDDSemiringTest {
 	}
 	
 	/**
+	 * Tests {@link ExprType#ARRAYLOAD}.
+	 */
+	@Test public void testArrayload() {
+		
+		VarManager manager = init();
+		
+		/*
+		 * Creates a new array with size [0,3] and load the element at index 1.
+		 * Note that there are two array bound violations.
+		 */
+		Semiring[] expr = new Semiring[] {
+				new BDDSemiring(manager, manager.initVars()),
+				new ExprSemiring(PUSH, new Value(0, 1, 3)),
+				new ExprSemiring(NEWARRAY, new Newarray(new Value(2))),
+				new ExprSemiring(PUSH, new Value(1)),
+				new ExprSemiring(ARRAYLOAD)
+		};
+		BDD bdd = run(expr);
+		print();
+		
+		// Tests whether the top of stack is 2
+		Set<Long> set = manager.valuesOf(bdd, manager.getStackDomain(0));
+		Assert.assertEquals(set.size(), 1);
+		Assert.assertTrue(set.contains(2l));
+		
+		free();
+		manager.free();
+	}
+	
+	/**
 	 * Tests {@link ExprType#ARRAYSTORE}.
 	 */
 	@Test public void testArraystore() {
 		
 		VarManager manager = init();
-		Sat.DEBUG = true;
 		
-		// Creates a new array and store a value
+		/*
+		 * Creates a new array with size [0,3] and store value 2 at index 1.
+		 * Note that there are two array bound violations.
+		 */
 		Semiring[] expr = new Semiring[] {
 				new BDDSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(0, 1, 3)),
@@ -91,7 +129,10 @@ public class BDDSemiringTest {
 		};
 		BDD bdd = run(expr);
 		
-		print();
+		// Tests whether the array at index 1 is 2
+		Set<Long> set = manager.valuesOf(bdd, manager.getHeapDomain(4));
+		Assert.assertEquals(set.size(), 1);
+		Assert.assertTrue(set.contains(2l));
 		
 		free();
 		manager.free();

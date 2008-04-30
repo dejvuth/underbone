@@ -770,6 +770,14 @@ public class VirtualMachine {
 					break;
 				}
 				
+				case SWAP: {
+					Number s0 = frame.stack.pop();
+					Number s1 = frame.stack.pop();
+					frame.stack.push(s0);
+					frame.stack.push(s1);
+					break;
+				}
+				
 				case UNARYOP: {
 					ExprSemiring.UnaryOpType type = (ExprSemiring.UnaryOpType) d.value;
 					Number s0 = frame.pop();
