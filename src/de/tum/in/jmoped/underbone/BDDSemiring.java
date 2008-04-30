@@ -224,7 +224,7 @@ public class BDDSemiring implements Semiring {
 			else {
 			
 				// Gets all possible s1 values
-				HashSet<Long> s1set = valuesOf(s1dom);
+				Set<Long> s1set = valuesOf(s1dom);
 				
 				d = factory.zero();
 				for (Long s1 : s1set) {
@@ -234,7 +234,7 @@ public class BDDSemiring implements Semiring {
 					
 					// Gets all possible s0 values wrt. s1
 					BDD e = bdd.id().andWith(s1dom.ithVar(s1));
-					HashSet<Long> s0set = valuesOf(manager, e, s0dom);
+					Set<Long> s0set = manager.valuesOf(e, s0dom);
 					e.free();
 					
 					for (Long s0 : s0set) {
@@ -367,6 +367,9 @@ public class BDDSemiring implements Semiring {
 			BDD c = store(bdd, manager.getLocalVarDomain(((Integer) A.value)));
 			return new BDDSemiring(manager, c);
 		}
+		
+		case SWAP:
+			return swap(A);
 		
 		case UNARYOP:
 			return unaryop(A);
@@ -1854,6 +1857,30 @@ public class BDDSemiring implements Semiring {
 		return new BDDSemiring(manager, c);
 	}
 	
+	private BDDSemiring swap(ExprSemiring A) {
+		
+		// Gets the current value of stack pointer (sp)
+		BDDDomain spdom = manager.getStackPointerDomain();
+		int sp = bdd.scanVar(spdom).intValue();
+		
+		// Prepares domains
+		BDDDomain s0dom = manager.getStackDomain(sp - 1);
+		BDDDomain s1dom = manager.getStackDomain(sp - 2);
+		BDDDomain tdom = manager.getTempVarDomain();
+		
+		// s0dom -> tdom
+		BDDFactory factory = bdd.getFactory();
+		BDD c = bdd.id().replaceWith(factory.makePair(s0dom, tdom));
+		
+		// s1dom -> s0dom
+		c.replaceWith(factory.makePair(s1dom, s0dom));
+		
+		// tdom -> s1dom
+		c.replaceWith(factory.makePair(tdom, s1dom));
+		
+		return new BDDSemiring(manager, c);
+	}
+	
 	private BDDSemiring unaryop(ExprSemiring A) {
 		
 		// Gets the current value of stack pointer (sp) minus 1
@@ -2017,22 +2044,9 @@ public class BDDSemiring implements Semiring {
 	 * @param dom the domain
 	 * @return the set of all possible integers
 	 */
-	public HashSet<Long> valuesOf(BDDDomain dom) {
+	public Set<Long> valuesOf(BDDDomain dom) {
 		
-		return valuesOf(manager, bdd, dom);
-	}
-	
-	public static HashSet<Long> valuesOf(VarManager manager, BDD bdd, BDDDomain dom) {
-		
-		BDDVarSet varset = dom.set();
-		BDDIterator itr = bdd.exist(manager.getVarSetWithout(dom.getIndex()))
-				.iterator(varset);
-		HashSet<Long> set = new HashSet<Long>();
-		while (itr.hasNext())
-			set.add(((BDD) itr.next()).scanVar(dom).longValue());
-		varset.free();
-		
-		return set;
+		return manager.valuesOf(bdd, dom);
 	}
 	
 	/**

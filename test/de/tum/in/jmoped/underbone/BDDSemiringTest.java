@@ -1,52 +1,129 @@
 package de.tum.in.jmoped.underbone;
 
+import static de.tum.in.jmoped.underbone.ExprType.ARRAYSTORE;
+import static de.tum.in.jmoped.underbone.ExprType.NEWARRAY;
 import static de.tum.in.jmoped.underbone.ExprType.PUSH;
+import static de.tum.in.jmoped.underbone.ExprType.SWAP;
+import static de.tum.in.jmoped.underbone.ExprSemiring.Newarray;
+import static de.tum.in.jmoped.underbone.ExprSemiring.Value;
+
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Set;
+import java.util.Stack;
+
+import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDDomain;
 import net.sf.javabdd.BDD.BDDIterator;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 import de.tum.in.wpds.CancelMonitor;
 import de.tum.in.wpds.DefaultMonitor;
+import de.tum.in.wpds.Sat;
 import de.tum.in.wpds.Semiring;
 
 public class BDDSemiringTest {
-
+	
+	static VarManager init() {
+		VarManager manager =  new VarManager("cudd", 10000, 10000, 
+				3, new long[] { 8, 8, 8, 8, 8, 8, 8 }, null, 3, 3, 1, false);
+		System.out.printf("Factory used: %s%n", manager.getFactory().getClass().getName());
+		return manager;
+	}
+	
+	private static Stack<Semiring> stack;
+	private static CancelMonitor monitor = new DefaultMonitor();
+	
+	private void extend(Semiring d) {
+		if (stack.isEmpty()) {
+			stack.push(d);
+			return;
+		}
+		stack.push(stack.peek().extend(d, monitor));
+	}
+	
+	private BDD peek() {
+		return ((BDDSemiring) stack.peek()).bdd;
+	}
+	
+	private BDD run(Semiring[] expr) {
+		stack = new Stack<Semiring>();
+		for (int i = 0; i < expr.length; i++)
+			extend(expr[i]);
+		return peek();
+	}
+	
+	private void print() {
+		Iterator<Semiring> itr = stack.iterator();
+		int count = 0;
+		while (itr.hasNext()) {
+			System.out.printf("\t%d:\t", count++);
+			System.out.println(itr.next());
+			System.out.println();
+		}
+	}
+	
+	private void free() {
+		Iterator<Semiring> itr = stack.iterator();
+		while (itr.hasNext()) {
+			itr.next().free();
+		}
+	}
+	
+	/**
+	 * Tests {@link ExprType#ARRAYSTORE}.
+	 */
 	@Test public void testArraystore() {
 		
-		VarManager manager = new VarManager("cudd", 10000, 10000, 
-				3, new long[] { 8, 8, 8, 8, 8, 8, 8 }, null, 3, 0, 1, false);
-		CancelMonitor monitor = new DefaultMonitor();
+		VarManager manager = init();
+		Sat.DEBUG = true;
 		
-		BDDSemiring A = new BDDSemiring(manager, manager.initVars());
-		BDDSemiring B = (BDDSemiring) A.extend(new ExprSemiring(ExprType.PUSH, 3, 0), monitor);
-		BDDSemiring C = (BDDSemiring) B.extend(new ExprSemiring(ExprType.NEWARRAY), monitor);
-		BDDSemiring D = (BDDSemiring) C.extend(new ExprSemiring(ExprType.PUSH, 1), monitor);
-		BDDSemiring E = (BDDSemiring) D.extend(new ExprSemiring(ExprType.PUSH, 2), monitor);
-		BDDSemiring F = (BDDSemiring) E.extend(new ExprSemiring(ExprType.ARRAYSTORE), monitor);
+		// Creates a new array and store a value
+		Semiring[] expr = new Semiring[] {
+				new BDDSemiring(manager, manager.initVars()),
+				new ExprSemiring(PUSH, new Value(0, 1, 3)),
+				new ExprSemiring(NEWARRAY, new Newarray()),
+				new ExprSemiring(PUSH, new Value(1)),
+				new ExprSemiring(PUSH, new Value(2)),
+				new ExprSemiring(ARRAYSTORE)
+		};
+		BDD bdd = run(expr);
 		
-		System.out.println("A: " + A);
-		System.out.println("B: " + B);
-		System.out.println("C: " + C);
-		System.out.println("D: " + D);
-		System.out.println("E: " + E);
-		System.out.println("F: " + F);
+		print();
 		
-		A.free(); B.free(); C.free(); D.free(); E.free(); F.free();
+		free();
 		manager.free();
 	}
 	
-	@Test public void test() {
+	/**
+	 * Tests {@link ExprType#SWAP}.
+	 */
+	@Test public void testSwap() {
 		
-		testArraystore();
-		VarManager manager = new VarManager("cudd", 10000, 10000, 
-				4, new long[] { 16, 16, 16, 16 }, null, 2, 2, 1, false);
-		CancelMonitor monitor = new DefaultMonitor();
+		VarManager manager = init();
 		
-		BDDSemiring A = new BDDSemiring(manager, manager.initVars());
-		BDDSemiring B = (BDDSemiring) A.extend(new ExprSemiring(ExprType.PUSH, 2), monitor);
+		// Pushes and swaps
+		Semiring[] expr = new Semiring[] {
+				new BDDSemiring(manager, manager.initVars()),
+				new ExprSemiring(PUSH, new Value(-1, 1, 1)),
+				new ExprSemiring(PUSH, new Value(2, 1, 3)),
+				new ExprSemiring(SWAP)
+		};
+		BDD bdd = run(expr);
 		
-		A.free(); B.free();// C.free(); D.free(); E.free(); F.free();
+		// The top of stack must be -1, 0, or 1
+		Set<Long> set = manager.valuesOf(bdd, manager.getStackDomain(1));
+		Assert.assertEquals(set.size(), 3);
+		Assert.assertTrue(set.containsAll(Arrays.asList( 7l, 0l, 1l )));
+		
+		// The second top of stack must be 2 or 3
+		set = manager.valuesOf(bdd, manager.getStackDomain(0));
+		Assert.assertEquals(set.size(), 2);
+		Assert.assertTrue(set.containsAll(Arrays.asList( 2l, 3l )));
+		
+		free();
 		manager.free();
 	}
 	

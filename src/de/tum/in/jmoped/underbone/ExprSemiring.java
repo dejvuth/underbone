@@ -199,6 +199,11 @@ public class ExprSemiring extends NullSemiring {
 		Object value;
 		int high;
 		
+		/**
+		 * Comparison with zero.
+		 * 
+		 * @param type the comparison type.
+		 */
 		public If(CompType type) {
 			switch (type) {
 			case EQ:	this.type = Type.EQ; break;
@@ -210,6 +215,11 @@ public class ExprSemiring extends NullSemiring {
 			}
 		}
 		
+		/**
+		 * Determines equality with the given value.
+		 * 
+		 * @param value the value.
+		 */
 		public If(int value) {
 			this.type = Type.IS;
 			this.value = value;
@@ -398,10 +408,17 @@ public class ExprSemiring extends NullSemiring {
 		int dim;
 		int[] types;
 		
+		/**
+		 * One-dimensional array initialized with zero
+		 */
 		public Newarray() {
 			this(new Value(0));
 		}
-		
+		/**
+		 * Zero array with the dimensions specified by <code>dim</code>.
+		 * 
+		 * @param dim the dimensions.
+		 */
 		public Newarray(int dim) {
 			this(new Value(0), dim);
 		}
@@ -494,7 +511,8 @@ public class ExprSemiring extends NullSemiring {
 	}
 	
 	/**
-	 * Used in PUSH and NEWARRAY.
+	 * Value for {@link ExprType#PUSH}
+	 * and argument of {@link Newarray}.
 	 * 
 	 * @author suwimont
 	 *
@@ -516,9 +534,16 @@ public class ExprSemiring extends NullSemiring {
 			this(value, null, null);
 		}
 		
-		public Value(Number value, Number next, Number to) {
+		/**
+		 * Creates a nondeterministic value [<code>from</code>,<code>to</code>].
+		 * 
+		 * @param from min value.
+		 * @param next ignored.
+		 * @param to max value.
+		 */
+		public Value(Number from, Number next, Number to) {
 			
-			this.value = value;
+			this.value = from;
 			this.next = next;
 			this.to = to;
 		}
@@ -543,15 +568,15 @@ public class ExprSemiring extends NullSemiring {
 			return value instanceof String;
 		}
 		
-//		public Number numberValue() {
-//			if (isString()) throw new RemoplaError("value is a string");
-//			return (Number) value;
-//		}
-		
 		public Object getValue() {
 			return value;
 		}
 		
+		/**
+		 * Returns the integer value.
+		 * 
+		 * @return the integer value.
+		 */
 		public int intValue() {
 			if (!isInteger()) 
 				throw new RemoplaError("value is not an integer");
@@ -590,6 +615,13 @@ public class ExprSemiring extends NullSemiring {
 		}
 	}
 	
+	/**
+	 * Value for {@link ExprType#UNARYOP} specifying
+	 * unary operation type: negation and type conversion.
+	 * 
+	 * @author suwimont
+	 *
+	 */
 	public static enum UnaryOpType {
 		NEG, FNEG, F2I, I2F
 	}
