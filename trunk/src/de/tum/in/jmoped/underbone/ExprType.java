@@ -253,6 +253,11 @@ public enum ExprType {
 	UNARYOP,
 	
 	/**
+	 * Swaps the top two operand stack values.
+	 */
+	SWAP,
+	
+	/**
 	 * Waits.
 	 */
 	WAITINVOKE,

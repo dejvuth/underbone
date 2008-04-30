@@ -664,8 +664,12 @@ public class VarManager {
 		return doms[index];
 	}
 	
+	/**
+	 * Gets the BDD factory.
+	 * 
+	 * @return the BDD factory.
+	 */
 	public BDDFactory getFactory() {
-		
 		return factory;
 	}
 	
@@ -1070,17 +1074,29 @@ public class VarManager {
 		return a;
 	}
 	
+	/**
+	 * Returns the BDD with domain specified by <code>dom</code>
+	 * representing values from <code>min</code> to <code>max</code>.
+	 * 
+	 * @param dom the domain of the BDD.
+	 * @param min the minimum value.
+	 * @param max the maximium value.
+	 * @return the BDD with values from <code>min</code> to <code>max</code>.
+	 */
 	public BDD bddRange(BDDDomain dom, int min, int max) {
 		
 		if (min == max)
 			return dom.ithVar(min);
 		
-		// Handles manually, because the library seems to be wrong in this case
-		if (min == 0 && max == 1)
-			return dom.ithVar(0).orWith(dom.ithVar(1));
+		// Bug in JavaBDD; Handles manually
 		
-		if (min >= 0) 
-			return dom.varRange(encode(min, dom), encode(max, dom));
+//		// Handles manually, because the library seems to be wrong in this case
+//		if (min == 0 && max == 1)
+//			return dom.ithVar(0).orWith(dom.ithVar(1));
+//		
+//		if (min >= 0) {
+//			return dom.varRange(encode(min, dom), encode(max, dom));
+//		}
 		
 		BDD a = factory.zero();
 		for (int i = min; i <= max; i++) {
@@ -1116,6 +1132,27 @@ public class VarManager {
 		varset.free();
 		
 		return itr;
+	}
+	
+	/**
+	 * Gets the set of values of the variables specified by <code>dom</code>
+	 * inside <code>bdd</code>.
+	 * 
+	 * @param bdd the BDD.
+	 * @param dom the BDD domain.
+	 * @return thes set of values.
+	 */
+	public Set<Long> valuesOf(BDD bdd, BDDDomain dom) {
+		
+		BDDVarSet varset = dom.set();
+		BDDIterator itr = bdd.exist(getVarSetWithout(dom.getIndex()))
+				.iterator(varset);
+		HashSet<Long> set = new HashSet<Long>();
+		while (itr.hasNext())
+			set.add(((BDD) itr.next()).scanVar(dom).longValue());
+		varset.free();
+		
+		return set;
 	}
 	
 	private int nargs;
