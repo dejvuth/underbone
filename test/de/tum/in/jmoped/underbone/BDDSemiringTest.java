@@ -5,10 +5,12 @@ import static de.tum.in.jmoped.underbone.ExprType.ARRAYSTORE;
 import static de.tum.in.jmoped.underbone.ExprType.NEWARRAY;
 import static de.tum.in.jmoped.underbone.ExprType.PUSH;
 import static de.tum.in.jmoped.underbone.ExprType.SWAP;
+import static de.tum.in.jmoped.underbone.ExprType.UNARYOP;
 import static de.tum.in.jmoped.underbone.ExprSemiring.Newarray;
 import static de.tum.in.jmoped.underbone.ExprSemiring.Value;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.Stack;
@@ -163,6 +165,46 @@ public class BDDSemiringTest {
 		set = manager.valuesOf(bdd, manager.getStackDomain(0));
 		Assert.assertEquals(set.size(), 2);
 		Assert.assertTrue(set.containsAll(Arrays.asList( 2l, 3l )));
+		
+		free();
+		manager.free();
+	}
+	
+	/**
+	 * Tests {@link ExprType#UNARYOP} 
+	 * having value {@link ExprSemiring.UnaryOpType#CONTAINS}.
+	 */
+	@Test public void testUnaryopContains() {
+		
+		VarManager manager = init();
+		
+		// Pushes and checks for containment.
+		Semiring[] expr = new Semiring[] {
+				new BDDSemiring(manager, manager.initVars()),
+				new ExprSemiring(PUSH, new Value(3)),
+				new ExprSemiring(UNARYOP, ExprSemiring.UnaryOpType.CONTAINS, 
+						new HashSet<Integer>(Arrays.asList(1, 3, 4)))
+		};
+		BDD bdd = run(expr);
+		
+		// The top of stack must be 1
+		Set<Long> set = manager.valuesOf(bdd, manager.getStackDomain(0));
+		Assert.assertEquals(set.size(), 1);
+		Assert.assertTrue(set.contains(1l));
+		
+		// Pushes and checks for containment.
+		expr = new Semiring[] {
+				new BDDSemiring(manager, manager.initVars()),
+				new ExprSemiring(PUSH, new Value(2)),
+				new ExprSemiring(UNARYOP, ExprSemiring.UnaryOpType.CONTAINS, 
+						new HashSet<Integer>(Arrays.asList(1, 3, 4)))
+		};
+		bdd = run(expr);
+		
+		// The top of stack must be 0
+		set = manager.valuesOf(bdd, manager.getStackDomain(0));
+		Assert.assertEquals(set.size(), 1);
+		Assert.assertTrue(set.contains(0l));
 		
 		free();
 		manager.free();

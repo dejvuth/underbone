@@ -131,7 +131,7 @@ public enum ExprType {
 	/**
 	 * Checks for heap overflow.
 	 * The field <code>value</code> is again of type ExprType: 
-	 * either {@link #NEW} or {@link NEWARRAY}.
+	 * either {@link #NEW} or {@link #NEWARRAY}.
 	 * The field <code>aux</code> corresponds to the field <code>value</code>,
 	 * i.e. either {@link ExprSemiring.New} or {@link ExprSemiring.Newarray}.
 	 */
@@ -182,6 +182,7 @@ public enum ExprType {
 	
 	/**
 	 * Pushes from a local variable.
+	 * The field <code>value</code> is an integer indexing the local variable.
 	 */
 	LOAD,
 	
@@ -234,6 +235,7 @@ public enum ExprType {
 	
 	/**
 	 * Pushes a constant.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Value}.
 	 */
 	PUSH,
 	
@@ -244,11 +246,13 @@ public enum ExprType {
 	
 	/**
 	 * Pops and stores in a local variable.
+	 * The field <code>value</code> is an integer indexing the local variable.
 	 */
 	STORE,
 	
 	/**
 	 * Performs unary operation.
+	 * The field <code>value</code> is of type {@link ExprSemiring.UnaryOpType}.
 	 */
 	UNARYOP,
 	

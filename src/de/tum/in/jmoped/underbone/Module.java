@@ -427,6 +427,9 @@ public class Module {
 		return String.format("%s[%s - %d]", stack, sptr, x);
 	}
 	
+	/**
+	 * @return s[sptr - 1]
+	 */
 	private static String s0() {
 		return s(1);
 	}
@@ -1015,7 +1018,21 @@ public class Module {
 		case F2I:
 		case I2F:
 			return "skip;";
+		default: {	// CONTAINS
+			Set<Integer> set = (Set<Integer>) d.aux;
+			StringBuilder b = new StringBuilder();
+			Utils.append(b, "if%n");
+			Utils.append(b, "\t:: (");
+			int count = 0;
+			for (Integer i : set) {
+				if (count++ != 0) b.append(" && ");
+				Utils.append(b, "%s == %d", s0(), i);
+			}
+			Utils.append(b, ") -> %s = 1;%n", s0());
+			Utils.append(b, "\t:: else -> %s = 0;%n", s0());
+			Utils.append(b, "fi;");
+			return b.toString();
 		}
-		throw new RemoplaError("Floating points not supported");
+		}
 	}
 }
