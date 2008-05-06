@@ -794,6 +794,10 @@ public class VirtualMachine {
 					case I2F:
 						s0 = s0.doubleValue();
 						break;
+					case CONTAINS:
+						Set<Integer> set = (Set<Integer>) d.aux;
+						s0 = (set.contains(s0.intValue())) ? 1 : 0;
+						break;
 					}
 					frame.stack.push(s0);
 					break;

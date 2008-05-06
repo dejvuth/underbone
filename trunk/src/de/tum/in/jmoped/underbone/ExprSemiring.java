@@ -623,6 +623,30 @@ public class ExprSemiring extends NullSemiring {
 	 *
 	 */
 	public static enum UnaryOpType {
-		NEG, FNEG, F2I, I2F
+		/**
+		 * Negates
+		 */
+		NEG, 
+		
+		/**
+		 * Negates float
+		 */
+		FNEG, 
+		
+		/**
+		 * Converts float to int
+		 */
+		F2I, 
+		
+		/**
+		 * Converts int to float
+		 */
+		I2F, 
+		
+		/**
+		 * Pushes one the set in <code>aux</code> contains the top-of-stack;
+		 * or zero otherwise.
+		 */
+		CONTAINS
 	}
 }

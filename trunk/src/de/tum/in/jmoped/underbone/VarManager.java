@@ -48,7 +48,7 @@ public class VarManager {
 	
 	private int tbound;
 	
-	private boolean symbolic;
+	private boolean lazy;
 	
 	static int varcopy = 3;
 	
@@ -128,20 +128,20 @@ public class VarManager {
 	/**
 	 * Constructs a variable manager.
 	 * 
-	 * @param bddpackage
-	 * @param nodenum
-	 * @param cachesize
-	 * @param bits
-	 * @param heapSizes
-	 * @param g
-	 * @param smax
-	 * @param lvmax
-	 * @param tbound
-	 * @param symbolic
+	 * @param bddpackage the BDD package: "cudd" or "java".
+	 * @param nodenum the estimated number of BDD nodes.
+	 * @param cachesize the cache size.
+	 * @param bits the number of variable bits.
+	 * @param heapSizes the heap sizes.
+	 * @param g the global variables.
+	 * @param smax the maximum stack depth.
+	 * @param lvmax the maximum number of local variables.
+	 * @param tbound the thread bound.
+	 * @param lazy lazy splitting?
 	 */
 	public VarManager(String bddpackage, int nodenum, int cachesize, 
 			int bits, long[] heapSizes, Collection<Variable> g, 
-			int smax, int lvmax, int tbound, boolean symbolic) {
+			int smax, int lvmax, int tbound, boolean lazy) {
 		
 		maxNodeNum = 0;
 		log("bits: %d, heapSizes: %s, g: %s, smax: %s, lvmax: %d, tbound %d%n",
@@ -153,10 +153,10 @@ public class VarManager {
 		this.smax = smax;
 		this.lvmax = lvmax;
 		this.tbound = tbound;
-		this.symbolic = symbolic;
-		this.globalcopy = (!multithreading() || !symbolic()) ? varcopy : varcopy + 2;
+		this.lazy = lazy;
+		this.globalcopy = (!multithreading() || !lazy()) ? varcopy : varcopy + 2;
 		
-		if (multithreading() && symbolic()) {
+		if (multithreading() && lazy()) {
 			gindex = new int[] { 0, 3, 4, 1, 2 };
 		} else {
 			gindex = new int[] { 0, 1, 2, 3, 4 };
@@ -170,8 +170,7 @@ public class VarManager {
 		if (g != null && !g.isEmpty()) {
 			s += globalcopy*g.size();
 		}
-//		s += (multithreading() && symbolic()) ? globalcopy : 1;	// ret var
-		s++;
+		s++;	// ret var
 		long[] domSize = new long[s];
 		
 		if (multithreading())
@@ -238,15 +237,6 @@ public class VarManager {
 			hDomIndex = -1;
 		}
 		
-//		if (multithreading() && symbolic()) {
-//			log("ret (%d)%n", index);
-//			retDomIndex = index;
-//			sharedDomIndex.add(index);
-//			for (int j = 0; j < globalcopy; j++)
-//				domSize[index++] = size;
-//			gnum++;
-//		}
-		
 		// Local vars
 		l0 = index;
 		if (lvmax > 0) {
@@ -280,10 +270,9 @@ public class VarManager {
 			sDomIndex = -1;
 		}
 		
-//		if (!multithreading() || !symbolic()) {
-			retDomIndex = index;
-			domSize[index++] = size;
-//		}
+		// Return and temp variable
+		retDomIndex = index;
+		domSize[index++] = size;
 		
 		factory = BDDFactory.init(bddpackage, nodenum, cachesize);
 		doms = factory.extDomain(domSize);
@@ -308,8 +297,8 @@ public class VarManager {
 		return tbound;
 	}
 	
-	public boolean symbolic() {
-		return symbolic;
+	public boolean lazy() {
+		return lazy;
 	}
 	
 	void updateMaxNodeNum() {
@@ -326,7 +315,7 @@ public class VarManager {
 	public BDD initVars() {
 		
 		// Initializes G3 in case of lazy splitting
-		int shifted = (multithreading() && symbolic()) ? gindex[3] : 0;
+		int shifted = (multithreading() && lazy()) ? gindex[3] : 0;
 		
 		// Initializes global variables
 		BDD a = factory.one();
@@ -783,7 +772,7 @@ public class VarManager {
 	 * @return two in normal case; or four in case of lazy splitting.
 	 */
 	int getArrayAuxSize() {
-		return (multithreading() && symbolic()) ? 4 : 2;
+		return (multithreading() && lazy()) ? 4 : 2;
 	}
 	
 	/**

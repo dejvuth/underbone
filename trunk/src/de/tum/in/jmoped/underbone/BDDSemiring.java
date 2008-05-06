@@ -1924,6 +1924,10 @@ public class BDDSemiring implements Semiring {
 			case I2F:
 				t = manager.encode((float) s0, s0dom);
 				break;
+			case CONTAINS:
+				Set<Integer> set = (Set<Integer>) A.aux;
+				t = (set.contains((int) s0)) ? 1 : 0;
+				break;
 			}
 			c.orWith(tdom.ithVar(t).andWith(s0dom.ithVar(s0)));
 		}
@@ -2388,8 +2392,8 @@ public class BDDSemiring implements Semiring {
 	 */
 	public Semiring lift(Semiring a) {
 		
-		// For symbolic case
-		if (manager.symbolic()) return lift2(); 
+		// For lazy splitting
+		if (manager.lazy()) return lift2(); 
 		
 		return new BDDSemiring(manager, bdd.and(((BDDSemiring) a).bdd));
 	}
