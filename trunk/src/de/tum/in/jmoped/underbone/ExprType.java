@@ -10,9 +10,13 @@ public enum ExprType {
 
 	/**
 	 * Performs arithmetic.
+	 * The field <code>value</code> is of type {@link ExprSemiring.ArithType}.
+	 * The field <code>aux</code> is of type {@link ExprSemiring.CategoryType}.
 	 * 
+	 * <pre>
 	 * Operand stack:
 	 * 		..., value1, value2 -&gt; ..., result
+	 * </pre>
 	 */
 	ARITH,
 	
@@ -25,39 +29,52 @@ public enum ExprType {
 	ARRAYLENGTH,
 	
 	/**
-	 * Loads from array
+	 * Loads from array.
+	 * The field <code>value</code> is of type {@link ExprSemiring.CategoryType}.
 	 * 
+	 * <pre>
 	 * Operand Stack:
 	 * 		..., arrayref, index -> ..., value
+	 * </pre>
 	 */
 	ARRAYLOAD,
 	
 	/**
-	 * Stores into array
+	 * Stores into array.
+	 * The field <code>value</code> is of type {@link ExprSemiring.CategoryType}.
 	 * 
+	 * <pre>
 	 * Operand Stack:
 	 * 		..., arrayref, index, value -> ...
+	 * </pre>
 	 */
 	ARRAYSTORE,
 	
 	/**
-	 * Pushes the constant specified by the field <code>value</code>.
+	 * Pushes the constant from static field.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Field}.
 	 * 
+	 * <pre>
 	 * Operand stack:
 	 * 		..., -> ..., value
+	 * </pre>
 	 */
 	CONSTLOAD,
 	
 	/**
-	 * Pops and stores to the constant specified by the field <code>value</code>.
+	 * Pops and stores constant to static field.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Field}.
 	 * 
+	 * <pre>
 	 * Operand stack:
 	 * 		..., value -> ...,
+	 * </pre>
 	 */
 	CONSTSTORE,
 	
 	/**
 	 * Duplicates the stack.
+	 * The field <code>value</code> is of type {@link ExprSemiring.DupType}.
 	 */
 	DUP,
 	
@@ -77,33 +94,40 @@ public enum ExprType {
 	
 	/**
 	 * Pushes the field of the instance specified by the top-of-stack.
-	 * The field <code>value</code> determines the field id.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Field}.
 	 * 
+	 * <pre>
 	 * Operand stack:
 	 * 		..., objectref -> ..., value
+	 * </pre>
 	 */
 	FIELDLOAD,
 	
 	/**
 	 * Pops to the field of the instance specified by the second top-of-stack.
-	 * The field <code>value</code> determines the field id.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Field}.
 	 * 
+	 * <pre>
 	 * Operand stack:
 	 * 		..., objectref, value -> ...,
+	 * </pre>
 	 */
 	FIELDSTORE,
 	
 	/**
 	 * Pushes the return value.
+	 * The field <code>value</code> is of type {@link ExprSemiring.CategoryType}.
 	 */
 	GETRETURN,
 	
 	/**
 	 * Pushes global variable into the stack.
-	 * The field <code>value</code> determines the global variable name.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Field}.
 	 * 
+	 * <pre>
 	 * Operand stack:
 	 * 		..., -> ..., value
+	 * </pre>
 	 */
 	GLOBALLOAD,
 	
@@ -116,10 +140,12 @@ public enum ExprType {
 	
 	/**
 	 * Pops to global variable.
-	 * The field <code>value</code> determines the global variable name.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Field}.
 	 * 
+	 * <pre>
 	 * Operand stack:
 	 * 		..., value -> ...,
+	 * </pre>
 	 */
 	GLOBALSTORE,
 	
@@ -162,6 +188,7 @@ public enum ExprType {
 	
 	/**
 	 * Compares the two top elements on the stack.
+	 * The field <code>value</code> is of type {@link ExprSemiring.CompType}.
 	 */
 	IFCMP,
 	
@@ -182,7 +209,7 @@ public enum ExprType {
 	
 	/**
 	 * Pushes from a local variable.
-	 * The field <code>value</code> is an integer indexing the local variable.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Local}.
 	 */
 	LOAD,
 	
@@ -203,6 +230,7 @@ public enum ExprType {
 	
 	/**
 	 * Creates a new array.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Newarray}.
 	 */
 	NEWARRAY,
 	
@@ -241,12 +269,13 @@ public enum ExprType {
 	
 	/**
 	 * Returns from a module.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Return}
 	 */
 	RETURN,
 	
 	/**
 	 * Pops and stores in a local variable.
-	 * The field <code>value</code> is an integer indexing the local variable.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Local}.
 	 */
 	STORE,
 	

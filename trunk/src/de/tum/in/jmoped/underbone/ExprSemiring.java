@@ -97,6 +97,37 @@ public class ExprSemiring extends NullSemiring {
 		FADD, FCMPG, FCMPL, FDIV, FMUL, FREM, FSUB
 	}
 	
+	/**
+	 * The category types.
+	 * 
+	 * @author suwimont
+	 *
+	 */
+	public enum CategoryType {
+		ONE(1), TWO(2);
+		
+		int category;
+		CategoryType(int category) {
+			this.category = category;
+		}
+		
+		public int intValue() {
+			return category;
+		}
+		
+		public boolean one() {
+			return category == 1;
+		}
+		
+		public boolean two() {
+			return category == 2;
+		}
+		
+		public String toString() {
+			return String.format("category:%d", category);
+		}
+	}
+	
 	public static enum CompType {
 		EQ("=="), NE("!="), LT("<"), GE(">="), GT(">"), LE("<=");
 		
@@ -189,8 +220,82 @@ public class ExprSemiring extends NullSemiring {
 		}
 	}
 	
+	/**
+	 * Value for {@link ExprType#DUP}.
+	 */
 	public static enum DupType {
-		DUP, DUP_X1, DUP_X2, DUP2, DUP2_X1, DUP2_X2;
+		DUP(1, 1), DUP_X1(2, 1), DUP_X2(3, 1), DUP2(2, 2), DUP2_X1(3, 2), DUP2_X2(4, 2);
+		
+		int down;
+		int push;
+		DupType(int down, int push) {
+			this.down = down;
+			this.push = push;
+		}
+	}
+	
+	/**
+	 * Field information.
+	 * Value for {@link ExprType#GLOBALLOAD}, {@link ExprType#GLOBALSTORE},
+	 * {@link ExprType#FIELDLOAD}, {@link ExprType#FIELDSTORE}.
+	 *
+	 */
+	public static class Field {
+		
+		/**
+		 * Category 1 or 2
+		 */
+		CategoryType category;
+		
+		/**
+		 * Id or offset of this field
+		 */
+		int id;
+		
+		/**
+		 * Name of this field.
+		 */
+		String name;
+		
+		/**
+		 * Constructs a static field information.
+		 * 
+		 * @param category the field category.
+		 * @param name the field name.
+		 */
+		public Field(CategoryType category, String name) {
+			this.category = category;
+			this.name = name;
+		}
+		
+		/**
+		 * Constructs an instance field information.
+		 * 
+		 * @param category the field category.
+		 * @param id the field id.
+		 */
+		public Field(CategoryType category, int id) {
+			this.category = category;
+			this.id = id;
+		}
+		
+		/**
+		 * Returns <code>true</code> if this field type is of category 2.
+		 * 
+		 * @return <code>true</code> if this field type is of category 2.
+		 */
+		public boolean categoryTwo() {
+			return category.two();
+		}
+		
+		/**
+		 * Returns the string representation of this field information.
+		 * 
+		 * @return the string representation of this field information.
+		 */
+		public String toString() {
+			return String.format("%s, id: %d, name: %s", category, id, name);
+		}
 	}
 	
 	public static class If {
@@ -288,14 +393,20 @@ public class ExprSemiring extends NullSemiring {
 		}
 	}
 	
+	/**
+	 * Invoke information.
+	 */
 	public static class Invoke {
 		
+		/**
+		 * <code>True</code> if the invoked method is static.
+		 */
 		boolean isStatic;
 		
 		/**
-		 * The number of arguments.
+		 * Number of arguments
 		 */
-		boolean[] params;
+		int nargs;
 		
 		/**
 		 * <code>True</code> iff the invoked method is the initial method.
@@ -303,26 +414,57 @@ public class ExprSemiring extends NullSemiring {
 		boolean init;
 		
 		public Invoke() {
-			this(true, new boolean[0]);
+			this(true, 0);
 		}
 		
-		public Invoke(boolean isStatic, boolean[] params) {
-			this(isStatic, params, false);
+		public Invoke(boolean isStatic, int nargs) {
+			this(isStatic, nargs, false);
 		}
 		
-		public Invoke(boolean isStatic, boolean[] params, boolean init) {
+		public Invoke(boolean isStatic, int nargs, boolean init) {
 			this.isStatic = isStatic;
-			this.params = params;
+			this.nargs = nargs;
 			this.init = init;
 		}
 		
 		public String toString() {
 			StringBuilder out = new StringBuilder();
 			
-			out.append(Arrays.toString(params));
+			out.append(String.format("nargs:%d", nargs));
 			
 			if (init) out.append(" init");
 			return out.toString();
+		}
+	}
+	
+	/**
+	 * Value for {@link ExprType#LOAD} and {@link ExprType#STORE}.
+	 */
+	public static class Local {
+		
+		/**
+		 * Category 1 or 2
+		 */
+		CategoryType category;
+		
+		/**
+		 * The index
+		 */
+		int index;
+		
+		/**
+		 * Constructs a local variable information.
+		 * 
+		 * @param category the category.
+		 * @param index the local variable index.
+		 */
+		public Local(CategoryType category, int index) {
+			this.category = category;
+			this.index = index;
+		}
+		
+		public String toString() {
+			return String.format("%s index:%d", category, index);
 		}
 	}
 	
@@ -377,9 +519,6 @@ public class ExprSemiring extends NullSemiring {
 	
 	/**
 	 * Value for {@link ExprType#NEW}.
-	 * 
-	 * @author suwimont
-	 *
 	 */
 	public static class New {
 		
@@ -412,7 +551,7 @@ public class ExprSemiring extends NullSemiring {
 		 * One-dimensional array initialized with zero
 		 */
 		public Newarray() {
-			this(new Value(0));
+			this(new Value(CategoryType.ONE, 0));
 		}
 		/**
 		 * Zero array with the dimensions specified by <code>dim</code>.
@@ -420,7 +559,7 @@ public class ExprSemiring extends NullSemiring {
 		 * @param dim the dimensions.
 		 */
 		public Newarray(int dim) {
-			this(new Value(0), dim);
+			this(new Value(CategoryType.ONE, 0), dim);
 		}
 		
 		/**
@@ -499,6 +638,29 @@ public class ExprSemiring extends NullSemiring {
 		}
 	}
 	
+	/**
+	 * Value for {@link ExprType#RETURN}.
+	 */
+	public static class Return {
+		
+		boolean something;
+		CategoryType category;
+		
+		public Return(boolean something) {
+			this(something, null);
+		}
+		
+		public Return(boolean something, CategoryType category) {
+			this.something = something;
+			this.category = category;
+		}
+		
+		public String toString() {
+			if (!something) return "void";
+			return category.toString();
+		}
+	}
+	
 	public static class Stub {
 		
 		String className;
@@ -519,6 +681,11 @@ public class ExprSemiring extends NullSemiring {
 	 */
 	public static class Value {
 		
+		/**
+		 * Category 1 or 2
+		 */
+		CategoryType category;
+		
 		private Object value;
 		Number next;
 		Number to;
@@ -526,12 +693,18 @@ public class ExprSemiring extends NullSemiring {
 		/**
 		 * Creates a nondeterministic value.
 		 */
-		public Value() {
+		public Value(CategoryType category) {
+			this.category = category;
 			value = null;
 		}
 		
-		public Value(Number value) {
-			this(value, null, null);
+		/**
+		 * Creates a deterministic value.
+		 * 
+		 * @param value the value.
+		 */
+		public Value(CategoryType category, Number value) {
+			this(category, value, null, null);
 		}
 		
 		/**
@@ -541,14 +714,15 @@ public class ExprSemiring extends NullSemiring {
 		 * @param next ignored.
 		 * @param to max value.
 		 */
-		public Value(Number from, Number next, Number to) {
-			
+		public Value(CategoryType category, Number from, Number next, Number to) {
+			this.category = category;
 			this.value = from;
 			this.next = next;
 			this.to = to;
 		}
 		
-		public Value(String value) {
+		public Value(CategoryType category, String value) {
+			this.category = category;
 			this.value = value;
 		}
 		
@@ -609,44 +783,106 @@ public class ExprSemiring extends NullSemiring {
 		}
 		
 		public String toString() {
-			if (value == null) return "all";
-			if (next == null) return value.toString();
-			return String.format("[%s, %s, ..., %s]", value, next, to);
+			if (value == null) return String.format("%s, value:all", category);
+			if (next == null) return String.format("%s, value:%s", category, value.toString());
+			return String.format("%s, value:[%s, %s, ..., %s]", category, value, next, to);
 		}
 	}
 	
 	/**
-	 * Value for {@link ExprType#UNARYOP} specifying
-	 * unary operation type: negation and type conversion.
-	 * 
-	 * @author suwimont
-	 *
+	 * Value for {@link ExprType#UNARYOP}.
 	 */
-	public static enum UnaryOpType {
-		/**
-		 * Negates
-		 */
-		NEG, 
+	public static class Unaryop {
 		
 		/**
-		 * Negates float
+		 * Operation type.
 		 */
-		FNEG, 
+		Type type;
+		
+		Set<Integer> set;
+		
+		public Unaryop(Type type) {
+			this.type = type;
+		}
+		
+		public Unaryop(Type type, Set<Integer> set) {
+			if (type != Type.CONTAINS)
+				throw new RemoplaError("Internal error: " +
+						"A Unary operation of type CONTAINS expected");
+			if (set == null || set.isEmpty())
+				throw new RemoplaError("Internal error: " +
+						"A set of integers expected");
+			this.type = type;
+			this.set = set;
+		}
+		
+		public String toString() {
+			if (set == null) return type.toString();
+			return String.format("%s %s", type, set);
+		}
 		
 		/**
-		 * Converts float to int
+		 * Unary operation type: negation and type conversion.
 		 */
-		F2I, 
-		
-		/**
-		 * Converts int to float
-		 */
-		I2F, 
-		
-		/**
-		 * Pushes one the set in <code>aux</code> contains the top-of-stack;
-		 * or zero otherwise.
-		 */
-		CONTAINS
+		public static enum Type {
+			
+			DNEG(CategoryType.TWO, CategoryType.TWO),
+			
+			/**
+			 * Negates float
+			 */
+			FNEG(CategoryType.ONE, CategoryType.ONE),
+			
+			/**
+			 * Negates
+			 */
+			INEG(CategoryType.ONE, CategoryType.ONE),
+			
+			LNEG(CategoryType.TWO, CategoryType.TWO),
+			
+			D2F(CategoryType.TWO, CategoryType.ONE),
+			D2I(CategoryType.TWO, CategoryType.ONE),
+			D2L(CategoryType.TWO, CategoryType.TWO),
+			
+			F2D(CategoryType.ONE, CategoryType.TWO),
+			
+			/**
+			 * Converts float to int
+			 */
+			F2I(CategoryType.ONE, CategoryType.ONE),
+			
+			F2L(CategoryType.ONE, CategoryType.TWO),
+			
+			I2D(CategoryType.ONE, CategoryType.TWO),
+			
+			/**
+			 * Converts int to float
+			 */
+			I2F(CategoryType.ONE, CategoryType.ONE),
+			
+			I2L(CategoryType.ONE, CategoryType.TWO),
+			
+			L2D(CategoryType.TWO, CategoryType.TWO),
+			
+			L2F(CategoryType.TWO, CategoryType.ONE),
+			
+			L2I(CategoryType.TWO, CategoryType.ONE),
+			
+			/**
+			 * Pushes one the set in <code>aux</code> contains the top-of-stack;
+			 * or zero otherwise.
+			 */
+			CONTAINS(CategoryType.ONE, CategoryType.ONE);
+			
+			CategoryType pop;
+			CategoryType push;
+			
+			Type(CategoryType pop, CategoryType push) {
+				this.pop = pop;
+				this.push = push;
+			}
+		}
 	}
+	
+
 }

@@ -13,6 +13,7 @@ import java.util.Stack;
 import java.util.logging.Logger;
 
 import de.tum.in.jmoped.underbone.ExprSemiring.ArithType;
+import de.tum.in.jmoped.underbone.ExprSemiring.CategoryType;
 import de.tum.in.jmoped.underbone.ExprSemiring.Condition;
 import de.tum.in.jmoped.underbone.ExprSemiring.DupType;
 import de.tum.in.jmoped.underbone.ExprSemiring.Condition.ConditionType;
@@ -192,8 +193,11 @@ public class VirtualMachine {
 				switch (d.type) {
 				
 				case ARITH: {
+					boolean two = ((CategoryType) d.aux).two();
 					Number s0 = frame.pop();
+					if (two) s0 = frame.pop();
 					Number s1 = frame.pop();
+					if (two) s1 = frame.pop();
 					ArithType type = (ArithType) d.value;
 					switch (type) {
 						case ADD: s0 = s1.longValue() + s0.longValue(); break;
@@ -229,6 +233,7 @@ public class VirtualMachine {
 						case FSUB: s0 = s1.doubleValue() - s0.doubleValue(); break;
 					}
 					frame.stack.push(s0);
+					if (two && type != ArithType.CMP) frame.stack.push(0);
 					break;
 				}
 				
@@ -299,55 +304,49 @@ public class VirtualMachine {
 				}
 				
 				case CONSTLOAD: {
-					// Checks whether the invoke condition is fulfilled
+					// Checks whether the condition is fulfilled
 					if (!fulfillsCondition(d)) {
 						thisrule = false;
 						break;
 					}
-					frame.push(constants.get((String) d.value));
+					
+					// Pushes constant
+					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+					frame.push(constants.get(field.name));
+					if (field.categoryTwo())
+						frame.push(0);
 					break;
 				}
 				
 				case CONSTSTORE: {
-					// Checks whether the invoke condition is fulfilled
+					// Checks whether the condition is fulfilled
 					if (!fulfillsCondition(d)) {
 						thisrule = false;
 						break;
 					}
-					constants.put((String) d.value, frame.pop());
+					
+					// Pops and stores constant
+					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+					if (field.categoryTwo())
+						frame.pop();
+					constants.put(field.name, frame.pop());
 					break;
 				}
 				
 				case DUP: {
+					// Pops
 					DupType type = (DupType) d.value;
-					switch (type) {
-					case DUP: {
-						Number s0 = frame.pop();
-						frame.stack.push(s0);
-						frame.stack.push(s0);
-						break;
-					}
-					case DUP_X1: {
-						Number s0 = frame.pop();
-						Number s1 = frame.pop();
-						frame.stack.push(s0);
-						frame.stack.push(s1);
-						frame.stack.push(s0);
-						break;
-					}
-					case DUP2: {
-						Number s0 = frame.pop();
-						Number s1 = frame.pop();
-						frame.stack.push(s1);
-						frame.stack.push(s0);
-						frame.stack.push(s1);
-						frame.stack.push(s0);
-						break;
-					}
-					default:
-						throw new IllegalArgumentException(
-								String.format("Instruction %s not supported", type));
-					}
+					Number[] values = new Number[type.down];
+					for (int i = 0; i < type.down; i++)
+						values[i] = frame.stack.pop();
+					
+					// Pushes
+					for (int i = type.push - 1; i >= 0; i--)
+						frame.stack.push(values[i]);
+					
+					// Shifts
+					for (int i = type.down - 1; i >= 0; i--)
+						frame.stack.push(values[i]);
 					break;
 				}
 				
@@ -368,7 +367,10 @@ public class VirtualMachine {
 					if (npe(s0, rule.left.w[0], listener, raw, frames)) break;
 					
 					// Pushes
-					frame.stack.push(heap.get(s0 + (Integer) d.value));
+					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+					frame.stack.push(heap.get(s0 + field.id));
+					if (field.categoryTwo())
+						frame.stack.push(0);
 					break;
 				}
 				
@@ -380,17 +382,22 @@ public class VirtualMachine {
 					}
 					
 					// Checkes NPE
+					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
 					Number s0 = frame.pop();
+					if (field.categoryTwo())
+						s0 = frame.pop();
 					int s1 = frame.pop().intValue();
 					if (npe(s1, rule.left.w[0], listener, raw, frames)) break;
 					
 					// Stores s0 to heap
-					heap.set(s1 + (Integer) d.value, s0);
+					heap.set(s1 + field.id, s0);
 					break;
 				}
 				
 				case GETRETURN: {
 					frame.stack.push(retvar);
+					if (((ExprSemiring.CategoryType) d.value).two())
+						frame.stack.push(0);
 					break;
 				}
 				
@@ -402,7 +409,10 @@ public class VirtualMachine {
 						break;
 					}
 					
-					frame.stack.push(globals.get((String) d.value));
+					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+					frame.stack.push(globals.get(field.name));
+					if (field.categoryTwo())
+						frame.stack.push(0);
 					break;
 				}
 				
@@ -420,7 +430,10 @@ public class VirtualMachine {
 						break;
 					}
 					
-					globals.put((String) d.value, frame.pop());
+					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+					Number value = frame.pop();
+					if (field.categoryTwo()) value = frame.pop();
+					globals.put(field.name, value);
 					break;
 				}
 				
@@ -510,8 +523,7 @@ public class VirtualMachine {
 				case INVOKE: {
 					// Checks NPE
 					ExprSemiring.Invoke invoke = (ExprSemiring.Invoke) d.value;
-					boolean[] params = invoke.params;
-					int nargs = params.length;
+					int nargs = invoke.nargs;
 					if (!invoke.isStatic) {
 						if (npe(frame.get(frame.stack.size() - nargs).intValue(), 
 								rule.left.w[0], listener, raw, frames)) {
@@ -536,7 +548,6 @@ public class VirtualMachine {
 					int j = 0;
 					for (int i = 0; i < nargs; i++, j++) {
 						newframe.lv[j] = args[i];
-						if (params[i]) j++;
 					}
 					frame.label = w[1];
 					frames.push(frame);
@@ -574,7 +585,6 @@ public class VirtualMachine {
 							}
 							display.add(array.toString());
 						}
-						if (params[i]) j++;
 					}
 					
 //					try {
@@ -612,7 +622,10 @@ public class VirtualMachine {
 				}
 				
 				case LOAD: {
-					frame.stack.push(frame.lv[(Integer) d.value]);
+					ExprSemiring.Local local = (ExprSemiring.Local) d.value;
+					frame.stack.push(frame.lv[local.index]);
+					if (local.category.two())
+						frame.stack.push(0);
 					break;
 				}
 				
@@ -755,18 +768,27 @@ public class VirtualMachine {
 					if (value.all()) frame.stack.push(0);
 					else if (value.isString()) frame.push(encode(value.stringValue()));
 					else frame.push((Number) value.getValue());
+					if (value.category.two())
+						frame.stack.push(0);
 					break;
 				}
 				
 				case RETURN: {
-					if ((Integer) d.value > 0)
-						retvar = frame.pop();
+					ExprSemiring.Return ret = (ExprSemiring.Return) d.value;
+					if (ret.something) {
+						retvar = frame.stack.pop();
+						if (ret.category.two())
+							retvar = frame.stack.pop();
+					}
 					frame = frames.pop();
 					break;
 				}
 				
 				case STORE: {
-					frame.lv[(Integer) d.value] = frame.pop();
+					ExprSemiring.Local local = (ExprSemiring.Local) d.value;
+					frame.lv[local.index] = frame.pop();
+					if (local.category.two())
+						frame.lv[local.index + 1] = frame.pop();
 					break;
 				}
 				
@@ -779,27 +801,42 @@ public class VirtualMachine {
 				}
 				
 				case UNARYOP: {
-					ExprSemiring.UnaryOpType type = (ExprSemiring.UnaryOpType) d.value;
-					Number s0 = frame.pop();
-					switch (type) {
-					case NEG:
-						s0 = -s0.longValue();
+					ExprSemiring.Unaryop unaryop = (ExprSemiring.Unaryop) d.value;
+					Number v = frame.pop();
+					if (unaryop.type.pop.two())
+						v = frame.pop();
+					switch (unaryop.type) {
+					case LNEG:	
+					case INEG:
+						v = -v.longValue();
 						break;
+					case DNEG:
 					case FNEG:
-						s0 = -s0.doubleValue();
+						v = -v.doubleValue();
 						break;
+					case D2I:
+					case D2L:
 					case F2I:
-						s0 = s0.intValue();
+					case F2L:
+					case L2I:
+					case I2L:
+						v = v.intValue();
 						break;
+					case D2F:
+					case F2D:
+					case I2D:
 					case I2F:
-						s0 = s0.doubleValue();
+					case L2D:
+					case L2F:
+						v = v.doubleValue();
 						break;
 					case CONTAINS:
-						Set<Integer> set = (Set<Integer>) d.aux;
-						s0 = (set.contains(s0.intValue())) ? 1 : 0;
+						v = (unaryop.set.contains(v.intValue())) ? 1 : 0;
 						break;
 					}
-					frame.stack.push(s0);
+					frame.stack.push(v);
+					if (unaryop.type.push.two())
+						frame.stack.push(0);
 					break;
 				}
 				}
@@ -928,14 +965,14 @@ public class VirtualMachine {
 		int id = 0;
 		switch (A.type) {
 		case INVOKE:
-			id = ((ExprSemiring.Invoke) A.value).params.length;
+			id = ((ExprSemiring.Invoke) A.value).nargs;
 			break;
 		case FIELDLOAD:
 		case ONE:
 			id = 1;
 			break;
 		case FIELDSTORE:
-			id = 2;
+			id = ((ExprSemiring.Field) A.value).categoryTwo() ? 3 : 2;
 			break;
 		}
 		

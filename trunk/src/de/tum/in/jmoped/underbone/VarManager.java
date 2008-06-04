@@ -703,8 +703,8 @@ public class VarManager {
 	/**
 	 * Returns the variable having the specified name.
 	 * 
-	 * @param name the name of the variable
-	 * @return the variable
+	 * @param name the name of the variable.
+	 * @return the variable.
 	 */
 	public Variable getGlobalVar(String name) {
 		
@@ -712,6 +712,12 @@ public class VarManager {
 		return globals.get(name);
 	}
 	
+	/**
+	 * Returns the BDD domain of the variable having the specified name.
+	 * 
+	 * @param name the name of the variable.
+	 * @return the BDD domain.
+	 */
 	public BDDDomain getGlobalVarDomain(String name) {
 		
 		Variable var = getGlobalVar(name);
@@ -1020,16 +1026,11 @@ public class VarManager {
 	 * @param nargs
 	 * @return
 	 */
-	BDD bddL0equalsL2params(int s, boolean[] params) {
+	BDD bddL0equalsL2params(int s, int nargs) {
 		
 		BDD d = factory.one();
-		for (int i = 0, j = 0; i < params.length; i++, j++) {
-			d.andWith(getStackDomain(s+i).buildEquals(doms[l0 + varcopy*j + 2]));
-			
-			// Skips one local variable is the argument is long or double
-			if (params[i]) {
-				j++;
-			}
+		for (int i = 0; i < nargs; i++) {
+			d.andWith(bddEquals(getStackDomain(s + i), doms[l0 + varcopy*i + 2]));
 		}
 		
 		return d;
