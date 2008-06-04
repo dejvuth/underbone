@@ -741,10 +741,10 @@ public class VirtualMachine {
 				}
 				
 				case POPPUSH: {
-					int pop = (Integer) d.value;
-					for (int i = 0; i < pop; i++)
+					ExprSemiring.Poppush poppush = (ExprSemiring.Poppush) d.value;
+					for (int i = 0; i < poppush.pop; i++)
 						frame.pop();
-					if ((Boolean) d.aux)
+					for (int i = 0; i < poppush.push; i++)
 						frame.stack.push(0);
 					break;
 				}

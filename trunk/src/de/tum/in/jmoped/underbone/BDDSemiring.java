@@ -1908,30 +1908,31 @@ public class BDDSemiring implements Semiring {
 		BDDDomain spdom = manager.getStackPointerDomain();
 		
 		// Changes nothing, if neither pop nor push
-		int pop = (Integer) A.value;
-		boolean push = (Boolean) A.aux;
-		if (pop == 0 && !push)
+		ExprSemiring.Poppush poppush = (ExprSemiring.Poppush) A.value;
+		if (poppush.nochange())
 			return new BDDSemiring(manager, bdd.id());
 		
 		// Gets the current value of stack pointer (sp)
 		int sp = bdd.scanVar(spdom).intValue();
 		
 		// Abstracts stack pointer and stack elements
-		BDDDomain[] d = new BDDDomain[pop + 1];
+		BDDDomain[] d = new BDDDomain[poppush.pop + 1];
 		d[0] = spdom;
-		for (int i = 1; i <= pop; i++)
+		for (int i = 1; i <= poppush.pop; i++)
 			d[i] = manager.getStackDomain(sp - i);
 		BDD c = abstractVars(bdd, d);
 		
 		// Updates the stack pointer
-		sp -= pop;
-		if (push) sp++;
+		sp = sp - poppush.pop + poppush.push;
 		c.andWith(spdom.ithVar(sp));
 		
+		for (int i = 1; i <= poppush.push; i++)
+			c.andWith(manager.getStackDomain(sp - i).ithVar(0));
+		
 		// FIXME prohibits non-determinism
-		if (push && manager.multithreading() /*&& !manager.symbolic()*/) {
-			c.andWith(manager.getStackDomain(sp - 1).ithVar(0));
-		}
+//		if (push && manager.multithreading() /*&& !manager.symbolic()*/) {
+//			c.andWith(manager.getStackDomain(sp - 1).ithVar(0));
+//		}
 		
 		return new BDDSemiring(manager, c);
 	}
@@ -2043,12 +2044,12 @@ public class BDDSemiring implements Semiring {
 		ExprSemiring.Unaryop unaryop = (ExprSemiring.Unaryop) A.value;
 		if (unaryop.type == ExprSemiring.Unaryop.Type.D2F
 				|| unaryop.type == ExprSemiring.Unaryop.Type.L2I)
-			return poppush(new ExprSemiring(ExprType.POPPUSH, 1, false));
+			return poppush(new ExprSemiring(ExprType.POPPUSH, new ExprSemiring.Poppush(1, 0)));
 		
 		// Widens: F2D, I2L
 		if (unaryop.type == ExprSemiring.Unaryop.Type.F2D
 				|| unaryop.type == ExprSemiring.Unaryop.Type.I2L)
-			return poppush(new ExprSemiring(ExprType.PUSH, 
+			return push(new ExprSemiring(ExprType.PUSH, 
 					new ExprSemiring.Value(ExprSemiring.CategoryType.ONE, 0)));
 		
 		// Gets the current value of stack pointer

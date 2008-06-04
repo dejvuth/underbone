@@ -250,8 +250,8 @@ public enum ExprType {
 	ONE,
 	
 	/**
-	 * Pops the stack <code>value</code> times, 
-	 * and pushes iff <code>aux</code> is <code>true</code>.
+	 * Pops and pushes the stack.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Newarray}.
 	 * The virtual machine always pushes zero.
 	 */
 	POPPUSH,
