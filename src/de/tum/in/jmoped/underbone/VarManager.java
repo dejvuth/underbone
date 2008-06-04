@@ -778,6 +778,7 @@ public class VarManager {
 	 * @return two in normal case; or four in case of lazy splitting.
 	 */
 	int getArrayAuxSize() {
+		//FIXME why 4 in lazy???
 		return (multithreading() && lazy()) ? 4 : 2;
 	}
 	

@@ -104,7 +104,7 @@ public class ExprSemiring extends NullSemiring {
 	 *
 	 */
 	public enum CategoryType {
-		ONE(1), TWO(2);
+		ZERO(0), ONE(1), TWO(2);
 		
 		int category;
 		CategoryType(int category) {
@@ -614,10 +614,33 @@ public class ExprSemiring extends NullSemiring {
 	}
 	
 	/**
-	 * Used in PRINT
-	 * 
-	 * @author suwimont
-	 *
+	 * Value for {@link ExprType#POPPUSH}.
+	 */
+	public static class Poppush {
+		
+		int pop;
+		int push;
+		
+		public Poppush(int pop, int push) {
+			this.pop = pop;
+			this.push = push;
+		}
+		
+		public boolean nochange() {
+			return pop == 0 && push == 0;
+		}
+		
+		public boolean push() {
+			return push > 0;
+		}
+		
+		public String toString() {
+			return String.format("pop:%d, push:%d", pop, push);
+		}
+	}
+	
+	/**
+	 * Value for {@link ExprType#PRINT}.
 	 */
 	public static class Print {
 		

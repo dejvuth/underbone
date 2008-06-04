@@ -1009,8 +1009,9 @@ public class Module {
 	}
 	
 	private static String poppush(ExprSemiring d) {
-		int pop = (Integer) d.value;
-		int push = ((Boolean) d.aux) ? 1 : 0;
+		ExprSemiring.Poppush poppush = (ExprSemiring.Poppush) d.value;
+		int pop = poppush.pop;
+		int push = poppush.push;
 		
 		if (pop == 0 && push == 0)
 			return "skip;";
@@ -1018,18 +1019,35 @@ public class Module {
 		if (push == 0)
 			return String.format("%s = %s - %d;", sptr, sptr, pop);
 		
-		// Remains: push == 1
+		if (pop == 0) {
+			StringBuilder b = new StringBuilder();
+			Utils.append(b, "%s[%s] = undef", stack, sptr);
+			if (push == 2)
+				Utils.append(b, ", %s[%s + 1] = undef", stack, sptr);
+			Utils.append(b, ", %s = %s + %d;", sptr, sptr, push);
+			return b.toString();
+		}
 		
-		if (pop == 0)
-			return String.format("%s[%s] = undef, %s = %s + 1;", 
-					stack, sptr, sptr, sptr);
+		if (pop == 1) {
+			StringBuilder b = new StringBuilder();
+			Utils.append(b, "%s = undef", s0(), sptr, sptr);
+			if (push == 1) {
+				b.append(';');
+				return b.toString();
+			}
+			// push == 2
+			Utils.append(b, ", %s[%s] = undef", stack, sptr);
+			Utils.append(b, ", %s = %s + 1;", sptr, sptr);
+			return b.toString();
+		}
 		
-		if (pop == 1)
-			return String.format("%s = undef;", 
-					s0(), sptr, sptr);
-		
-		return String.format("%s[%s - %d] = undef, %s = %s - %d;", 
-					stack, sptr, pop, sptr, sptr, pop - 1);
+		// pop >= 2
+		StringBuilder b = new StringBuilder();
+		Utils.append(b, "%s[%s - %d] = undef", stack, sptr, pop);
+		if (push == 2)
+			Utils.append(b, ", %s[%s - %d] = undef", stack, sptr, pop - 1);
+		Utils.append(b, ", %s = %s - %d;", sptr, sptr, pop - push);
+		return b.toString();
 	}
 	
 	private static String push(ExprSemiring d) {
