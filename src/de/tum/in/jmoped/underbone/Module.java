@@ -1086,9 +1086,10 @@ public class Module {
 	}
 	
 	private static String returnexpr(ExprSemiring d) {
-		ExprSemiring.Return ret = (ExprSemiring.Return) d.value;
-		if (ret.something)
-			return String.format("%s = %s[%s - %d]; return;", ret, stack, sptr, ret.category);
+		ExprSemiring.Return r = (ExprSemiring.Return) d.value;
+		if (r.something)
+			return String.format("%s = %s[%s - %d]; return;", 
+					ret, stack, sptr, r.category.intValue());
 		return "return;";
 	}
 	
