@@ -587,7 +587,7 @@ public class ExprSemiring extends NullSemiring {
 		}
 		
 		public String toString() {
-			return String.format("value: %s, dim: %d, type: %s", 
+			return String.format("%s dim: %d type: %s", 
 					init.toString(), dim, Arrays.toString(types));
 		}
 	}
@@ -793,22 +793,27 @@ public class ExprSemiring extends NullSemiring {
 		}
 		
 		/**
-		 * Returns <code>true</code> if push all values.
+		 * Returns <code>true</code> if the value is nondeterministic over
+		 * all range.
 		 * 
-		 * @return <code>true</code> if push all values.
+		 * @return <code>true</code> if the value is nondeterministic over
+		 * all range.
 		 */
 		public boolean all() {
 			return value == null;
 		}
 		
 		public boolean deterministic() {
-			return value != null && next == null && to == null;
+			return (value != null && next == null && to == null)
+					|| to != null && 
+						(isInteger() && intValue() == to.intValue()
+						|| isReal() && floatValue() == to.floatValue());
 		}
 		
 		public String toString() {
-			if (value == null) return String.format("%s, value:all", category);
-			if (next == null) return String.format("%s, value:%s", category, value.toString());
-			return String.format("%s, value:[%s, %s, ..., %s]", category, value, next, to);
+			if (value == null) return String.format("%s value:all", category);
+			if (next == null) return String.format("%s value:%s", category, value.toString());
+			return String.format("%s value:[%s, %s, ..., %s]", category, value, next, to);
 		}
 	}
 	

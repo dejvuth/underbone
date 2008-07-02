@@ -346,11 +346,11 @@ public class Module {
 		for (int i = params.length; i < lvnum; i++) {
 			Utils.append(out, "int %s%d;%n", lv, i);
 		}
+		Utils.append(out, "%n");
 		
 		// Init operand stack
 		if (sdepth > 0)
 			Utils.append(out, "%s = 0;%n", sptr);
-		Utils.append(out, "%n");
 		
 		// Rules
 		Iterator<Rule> itr = rules.iterator();
@@ -492,7 +492,7 @@ public class Module {
 		int category = ((CategoryType) d.aux).intValue();
 		return String.format("%s[%s - %d] = %s[%s - %d] %s %s[%s - %d], %s = %s - %d;", 
 				stack, sptr, 2*category, 
-				stack, sptr, category, op, stack, sptr, category, 
+				stack, sptr, 2*category, op, stack, sptr, category, 
 				sptr, sptr, category);
 	}
 	
@@ -1059,7 +1059,7 @@ public class Module {
 			int n = value.intValue();
 			topush = (n >= 0) ? String.valueOf(n) : "undef";
 		} else {
-			if (value.intValue() < 0 || value.to.intValue() < 0) {
+			if (value.intValue() < 0 || value.to != null && value.to.intValue() < 0) {
 				topush = "undef";
 			}
 		}
@@ -1069,14 +1069,14 @@ public class Module {
 		
 		// Total nondeterministic or deterministic
 		if (topush != null) {
-			if (value.category.one())
+			if (value.category.two())
 				cat2 = String.format(", %s[%s + 1] = 0", stack, sptr);
 			return String.format("%s[%s] = %s%s, %s = %s + %d;",
 					stack, sptr, topush, cat2, sptr, sptr, value.category.intValue());
 		}
 		
 		// Value range
-		if (value.category.one())
+		if (value.category.two())
 			cat2 = String.format(" && %s'[%s + 1] == 0", stack, sptr);
 		return String.format("skip (%s'[%s] >= %d && %s'[%s] <= %d%s && %s' == %s + %d);",
 				stack, sptr, value.intValue(), 
