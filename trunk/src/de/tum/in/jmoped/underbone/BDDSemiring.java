@@ -391,8 +391,8 @@ public class BDDSemiring implements Semiring {
 				long v2 = g.scanVar(v2dom).longValue();
 				g.free();
 				
-				long r = manager.arith(arithtype, tdom, v1, v1dom, v2, v2dom);
-				f.orWith(v2dom.ithVar(v2).andWith(tdom.ithVar(r)));
+				BDD h = manager.arith(arithtype, tdom, v1, v1dom, v2, v2dom);
+				f.orWith(v2dom.ithVar(v2).andWith(h));
 			}
 			d.orWith(v1dom.ithVar(v1).andWith(f));
 			e.free();
@@ -1728,6 +1728,13 @@ public class BDDSemiring implements Semiring {
 		} 
 		
 		// Nondeterministic, but not all
+		if (value.isReal())
+			return manager.bddRange(dom, value.floatValue(), value.next, 
+					value.to.floatValue());
+			
+		if (Sat.DEBUG)
+			log("\t\tvalue.intValue(): %d, value.to.intValue(): %d%n",
+					value.intValue(), value.to.intValue());
 		return manager.bddRange(dom, value.intValue(), value.to.intValue());
 	}
 	

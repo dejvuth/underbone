@@ -1111,6 +1111,27 @@ public class VarManager {
 	}
 	
 	/**
+	 * TODO this is not compatible with the semantics of Java
+	 * because max is inclusive.
+	 * 
+	 * @param dom
+	 * @param min
+	 * @param next
+	 * @param max
+	 * @return
+	 */
+	public BDD bddRange(BDDDomain dom, float min, Number next, float max) {
+		
+		float step = (next == null) ? (max - min)/(size - 1) : next.floatValue();
+		
+		BDD a = factory.zero();
+		for (float i = min; i <= max; i += step)
+			a.orWith(dom.ithVar(encode(i, dom)));
+		
+		return a;
+	}
+	
+	/**
 	 * Gets the BDD iterator from the <code>bdd</code>.
 	 * The iterator contains only the variables specified by <code>dom</code>. 
 	 * 
@@ -1404,60 +1425,73 @@ public class VarManager {
 		return v > dom.size().longValue()/2 - 1;
 	}
 	
-	public long arith(ArithType type, BDDDomain rdom, 
+	/**
+	 * Performs arithmetic.
+	 * 
+	 * @param type the arithmetic type.
+	 * @param rdom the result domain.
+	 * @param v1 the value 1.
+	 * @param dom1 the domain of value 1.
+	 * @param v2 the value 2.
+	 * @param dom2 the domain of value 2.
+	 * @return the arithmetic result.
+	 */
+	public BDD arith(ArithType type, BDDDomain rdom, 
 			long v1, BDDDomain dom1, long v2, BDDDomain dom2) {
 		
 		switch (type) {
 		case ADD:
-			return encode(decode(v1, dom1) + decode(v2, dom2), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) + decode(v2, dom2), rdom));
 		case AND:
-			return encode(decode(v1, dom1) & decode(v2, dom2), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) & decode(v2, dom2), rdom));
 		case CMP: {
 			int de1 = decode(v1, dom1);
 			int de2 = decode(v2, dom2);
-			if (de1 > de2) return encode(1, rdom);
-			if (de1 == de2) return encode(0, rdom);
-			return encode(-1, rdom);
+			if (de1 > de2) return rdom.ithVar(encode(1, rdom));
+			if (de1 == de2) return rdom.ithVar(encode(0, rdom));
+			return rdom.ithVar(encode(-1, rdom));
 		}
 		case DIV:
-			return encode(decode(v1, dom1) / decode(v2, dom2), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) / decode(v2, dom2), rdom));
 		case MUL:
-			return encode(decode(v1, dom1) * decode(v2, dom2), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) * decode(v2, dom2), rdom));
 		case OR:
-			return encode(decode(v1, dom1) | decode(v2, dom2), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) | decode(v2, dom2), rdom));
 		case REM:
-			return encode(decode(v1, dom1) % decode(v2, dom2), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) % decode(v2, dom2), rdom));
 		case SHL:
-			return encode(decode(v1, dom1) << (decode(v2, dom2) & 31), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) << (decode(v2, dom2) & 31), rdom));
 		case SHR:
-			return encode(decode(v1, dom1) >> (decode(v2, dom2) & 31), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) >> (decode(v2, dom2) & 31), rdom));
 		case SUB:
-			return encode(decode(v1, dom1) - decode(v2, dom2), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) - decode(v2, dom2), rdom));
 		case USHR:
-			return encode(decode(v1, dom1) >>> (decode(v2, dom2) & 31), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) >>> (decode(v2, dom2) & 31), rdom));
 		case XOR:
-			return encode(decode(v1, dom1) ^ decode(v2, dom2), rdom);
+			return rdom.ithVar(encode(decode(v1, dom1) ^ decode(v2, dom2), rdom));
 		case FADD:
-			return encode(decodeFloat(v1) + decodeFloat(v2), rdom);
+			return rdom.ithVar(encode(decodeFloat(v1) + decodeFloat(v2), rdom));
 		case FCMPG: 
 		case FCMPL: {
 			float f1 = decodeFloat(v1);
 			float f2 = decodeFloat(v2);
-			if (f1 > f2) return encode(1, rdom);
-			else if (f1 == f2) return encode(0, rdom);
-			else if (f1 < f2) return encode(-1, rdom);
+			if (f1 > f2) return rdom.ithVar(encode(1, rdom));
+			else if (f1 == f2) return rdom.ithVar(encode(0, rdom));
+			else if (f1 < f2) return rdom.ithVar(encode(-1, rdom));
 			// At least one must be NaN
-			else if (type == ArithType.FCMPG) return encode(1, rdom);
-			else return encode(-1, rdom);
+			else if (type == ArithType.FCMPG) return rdom.ithVar(encode(1, rdom));
+			else return rdom.ithVar(encode(-1, rdom));
 		}
 		case FDIV:
-			return encode(decodeFloat(v1) / decodeFloat(v2), rdom);
+			return rdom.ithVar(encode(decodeFloat(v1) / decodeFloat(v2), rdom));
 		case FMUL:
-			return encode(decodeFloat(v1) * decodeFloat(v2), rdom);
+			return rdom.ithVar(encode(decodeFloat(v1) * decodeFloat(v2), rdom));
 		case FREM:
-			return encode(decodeFloat(v1) % decodeFloat(v2), rdom);
+			return rdom.ithVar(encode(decodeFloat(v1) % decodeFloat(v2), rdom));
 		case FSUB:
-			return encode(decodeFloat(v1) - decodeFloat(v2), rdom);
+			return rdom.ithVar(encode(decodeFloat(v1) - decodeFloat(v2), rdom));
+		case NDT:
+			return bddRange(rdom, decode(v1, dom1), decode(v2, dom2));
 			
 		default:
 			throw new IllegalArgumentException("Invalid ArithType: " + type);
