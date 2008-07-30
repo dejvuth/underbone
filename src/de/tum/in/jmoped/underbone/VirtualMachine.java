@@ -58,6 +58,11 @@ public class VirtualMachine {
 	private Map<String, List<RawArgument>> raws;
 	
 	/**
+	 * Controls whether to display method arguments when executing Remopla.
+	 */
+	private boolean displayArgs = true;
+	
+	/**
 	 * Verbosity level.
 	 */
 	private static int verbosity = 0;
@@ -123,9 +128,11 @@ public class VirtualMachine {
 		for (String label : labels)
 			log("%s%n", label);
 		
+		// Creates Remopla listener and wraps the monitor
 		RemoplaListener listener = remopla.getRemoplaListener();
 		listener.setProgressMonitor(monitor);
 		listener.beginTask(remopla.getLastCalledName(), labels);
+		monitor.subTask("Analyzing ...");
 		
 		HashMap<Config, Set<Rule>> rmap = remopla.getPds().getLeftMapper();
 		
@@ -231,22 +238,16 @@ public class VirtualMachine {
 						case FMUL: s0 = s1.doubleValue() * s0.doubleValue(); break;
 						case FREM: s0 = s1.doubleValue() % s0.doubleValue(); break;
 						case FSUB: s0 = s1.doubleValue() - s0.doubleValue(); break;
+						case NDT: {
+							double p = s0.doubleValue() - s1.doubleValue() + 1.0;
+							s0 = ((long) (p * Math.random())) + s1.longValue();
+							break;
+						}
 					}
 					frame.stack.push(s0);
 					if (two && type != ArithType.CMP) frame.stack.push(0);
 					break;
 				}
-				
-//				case ARRAYCOPY: {
-//					int newindex = heap.size();
-//					Number oldindex = frame.stack.peek();
-//					Number length = heap.get(oldindex.intValue());
-//					heap.add(length);
-//					for (int i = 0; i < length; i++)
-//						heap.add(heap.get(oldindex + i + 1));
-//					frame.stack.push(newindex);
-//					break;
-//				}
 				
 				case ARRAYLENGTH: {
 					// Checks NPE
@@ -275,19 +276,9 @@ public class VirtualMachine {
 					break;
 				}
 				
-//				case ARRAYPUSH: {
-//					int ptr = frame.stack.peek();
-//					int length = heap.get(ptr);
-//					int value = (Integer) d.value;
-//					for (int i = 0; i < length; i++) {
-//						heap.set(ptr + i + 1, value);
-//					}
-//					break;
-//				}
-				
 				case ARRAYSTORE: {
 					// Checks NPE
-					Number s0 = frame.pop();	// value
+					Number s0 = frame.pop();			// value
 					int s1 = frame.pop().intValue();	// index
 					int s2 = frame.pop().intValue();	// arrayref
 					if (npe(s2, rule.left.w[0], listener, raw, frames)) 
@@ -559,15 +550,17 @@ public class VirtualMachine {
 					
 					// Creates raw argument
 					raw = new RawArgument(frame.lv.length, heap.size() - 1);
-					for (int i = 0; i < frame.lv.length; i++)
-						raw.lv[i] = frame.lv[i];
-					for (int i = 0; i < heap.size() - 1; i++)
-						raw.heap[i] = heap.get(i + 1);
+					System.arraycopy(frame.lv, 0, raw.lv, 0, frame.lv.length);
+					System.arraycopy(heap.toArray(), 1, raw.heap, 0, heap.size() - 1);
+
 					
 					/*
 					 * The rest is for display only:
 					 * Subtasks with the arguments when the selected method is called
 					 */
+					if (!displayArgs)
+						break;
+					
 					String desc = LabelUtils.extractMethodDescriptorFromLabel(w[0]);
 					List<String> types = LabelUtils.getParamTypes(desc);
 					List<String> display = new LinkedList<String>();
@@ -587,22 +580,6 @@ public class VirtualMachine {
 						}
 					}
 					
-//					try {
-//						for (int i = nargs - 1; i >= 0; i--) {
-//							if (types.get(i).charAt(0) != '[') {
-//								display.push(String.valueOf(frame.lv[i]));
-//							} else {
-//								int ptr = frame.lv[i].intValue();
-//								int length = heap.get(ptr).intValue();
-//								ArrayList<Number> array = new ArrayList<Number>();
-//								for (j = 0; j < length; j++) {
-//									array.add(heap.get(ptr + j + 1));
-//								}
-//								display.push(array.toString());
-//							}
-//						}
-//					} catch (IndexOutOfBoundsException e) {
-//					}
 					String msg = "(" + toCommaString(display) + ")";
 					log("\t\t%s%n", msg);
 					monitor.subTask(msg);
@@ -709,13 +686,6 @@ public class VirtualMachine {
 						}
 					}
 					frame.stack.push(indices.remove());
-					
-//					int index = heap.size();
-//					int length = frame.popNumber().intValue();
-//					heap.add(length);
-//					for (int i = 0; i < length; i++)
-//						heap.add((Integer) d.value);
-//					frame.stack.push(index);
 					break;
 				}
 				
@@ -766,8 +736,19 @@ public class VirtualMachine {
 				case PUSH: {
 					ExprSemiring.Value value = (ExprSemiring.Value) d.value;
 					if (value.all()) frame.stack.push(0);
-					else if (value.isString()) frame.push(encode(value.stringValue()));
-					else frame.push((Number) value.getValue());
+					else if (value.isString()) 
+						frame.push(encode(value.stringValue()));
+					else if (value.deterministic())
+						frame.push((Number) value.getValue());
+					else if (value.isInteger()) {
+						double p = value.to.intValue() - value.intValue() + 1;
+						frame.push(((int) (p * Math.random())) + value.intValue());
+					} else {
+						if (value.floatValue() != 0f || value.floatValue() != 1f)
+							throw new RemoplaError("Unsupported operation");
+						frame.push(Math.random());
+					}
+					
 					if (value.category.two())
 						frame.stack.push(0);
 					break;
@@ -981,9 +962,6 @@ public class VirtualMachine {
 	
 	/**
 	 * Call frame.
-	 * 
-	 * @author suwimont
-	 *
 	 */
 	private class Frame {
 		
@@ -1003,17 +981,9 @@ public class VirtualMachine {
 			return stack.pop();
 		}
 		
-//		public Number popAsNumber() {
-//			return (Number) stack.pop();
-//		}
-		
 		public Number get(int index) {
 			return stack.get(index);
 		}
-		
-//		public Number getAsNumber(int index) {
-//			return (Number) stack.get(index);
-//		}
 		
 		public String toString() {
 			
@@ -1022,6 +992,9 @@ public class VirtualMachine {
 		}
 	}
 	
+	/**
+	 * The heap.
+	 */
 	private class Heap {
 		
 		ArrayList<Number> heap = new ArrayList<Number>();
@@ -1068,6 +1041,15 @@ public class VirtualMachine {
 		
 		public int size() {
 			return heap.size();
+		}
+		
+		/**
+		 * Returns an array representing the current heap values.
+		 * 
+		 * @return an array representing the current heap values.
+		 */
+		public Number[] toArray() {
+			return heap.toArray(new Number[heap.size()]);
 		}
 		
 		public String toString() {

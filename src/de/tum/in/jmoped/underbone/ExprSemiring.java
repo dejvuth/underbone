@@ -94,7 +94,7 @@ public class ExprSemiring extends NullSemiring {
 	 */
 	public enum ArithType {
 		ADD, AND, CMP, DIV, MUL, OR, REM, SHL, SHR, SUB, USHR, XOR,
-		FADD, FCMPG, FCMPL, FDIV, FMUL, FREM, FSUB
+		FADD, FCMPG, FCMPL, FDIV, FMUL, FREM, FSUB, NDT;
 	}
 	
 	/**

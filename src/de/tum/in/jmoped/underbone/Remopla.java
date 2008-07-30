@@ -208,8 +208,8 @@ public class Remopla {
 		sat = new PdsSat(pds);
 		post = (Fa) sat.poststar(fa);
 		Set<String> labels = post.getLabels();
-		for (String label : labels)
-			log("%s%n", label);
+//		for (String label : labels)
+//			log("%s%n", label);
 		
 		// Creates variable manager
 		manager = new VarManager(bddpackage, nodenum, cachesize, 

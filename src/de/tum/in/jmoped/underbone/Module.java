@@ -627,10 +627,10 @@ public class Module {
 			}
 			break;
 		case ZERO:
-			Utils.append(b, "%s == 0", (String) cond.value);
+			Utils.append(b, "%s == 0", Remopla.mopedize((String) cond.value));
 			break;
 		case ONE:
-			Utils.append(b, "%s == 1", (String) cond.value);
+			Utils.append(b, "%s == 1", Remopla.mopedize((String) cond.value));
 			break;
 		}
 		
@@ -720,7 +720,7 @@ public class Module {
 	
 	private static String globalpush(ExprSemiring d) {
 		return String.format("%s = %d;", 
-				(String) d.value, (Integer) d.aux);
+				Remopla.mopedize((String) d.value), (Integer) d.aux);
 	}
 	
 	private static String globalstore(ExprSemiring d) {
@@ -914,7 +914,7 @@ public class Module {
 			
 			// Checks whether heap is enough
 			if (!nehprinted) {
-				Utils.append(b, "\t :: (%s + %s + 1 > %d) -> %s: goto %s;%n", 
+				Utils.append(b, "\t:: (%s + %s + 1 > %d) -> %s: goto %s;%n", 
 						hptr, n.size, heapsize, 
 						Remopla.mopedize(LabelUtils.formatHeapOverflowName(rule.getLabel())),
 						Remopla.notenoughheap);
