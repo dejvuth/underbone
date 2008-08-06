@@ -173,6 +173,7 @@ public class ExprSemiring extends NullSemiring {
 					throw new IllegalArgumentException("Argument of type String expected");
 				break;
 			case CONTAINS:
+			case NOTCONTAINS:
 				if (!(value instanceof Set))
 					throw new IllegalArgumentException("Argument of type Set expected");
 				break;
@@ -216,7 +217,12 @@ public class ExprSemiring extends NullSemiring {
 			 * the set. Note that the class id is obtained from the heap
 			 * where the stack representing the first argument points to.
 			 */
-			CONTAINS;
+			CONTAINS,
+			
+			/**
+			 * Opposite to CONTAINS.
+			 */
+			NOTCONTAINS;
 		}
 	}
 	
@@ -435,6 +441,10 @@ public class ExprSemiring extends NullSemiring {
 			if (init) out.append(" init");
 			return out.toString();
 		}
+	}
+	
+	public static enum JumpType {
+		ONE, THROW;
 	}
 	
 	/**
@@ -666,21 +676,47 @@ public class ExprSemiring extends NullSemiring {
 	 */
 	public static class Return {
 		
-		boolean something;
-		CategoryType category;
+		Type type;
+		private Object value;
 		
-		public Return(boolean something) {
-			this(something, null);
+		public Return(Type type) {
+			this(type, null);
 		}
 		
-		public Return(boolean something, CategoryType category) {
-			this.something = something;
-			this.category = category;
+		public Return(Type type, Object value) {
+			this.type = type;
+			this.value = value;
 		}
+		
+		public CategoryType getCategory() {
+			return (CategoryType) value;
+		}
+		
+//		public ThrowInfo getThrowInfo() {
+//			return (ThrowInfo) value;
+//		}
 		
 		public String toString() {
-			if (!something) return "void";
-			return category.toString();
+			if (type == Type.VOID) return "void";
+			return getCategory().toString();
+		}
+		
+		public static enum Type {
+			VOID, SOMETHING;
+		}
+		
+		public static class ThrowInfo {
+			Set<Integer> set;
+			String var;
+			
+			public ThrowInfo(Set<Integer> set, String var) {
+				this.set = set;
+				this.var = var;
+			}
+			
+			public String toString() {
+				return String.format("set: %s var: %s", set, var);
+			}
 		}
 	}
 	

@@ -16,6 +16,8 @@ import de.tum.in.jmoped.underbone.ExprSemiring.ArithType;
 import de.tum.in.jmoped.underbone.ExprSemiring.CategoryType;
 import de.tum.in.jmoped.underbone.ExprSemiring.Condition;
 import de.tum.in.jmoped.underbone.ExprSemiring.DupType;
+import de.tum.in.jmoped.underbone.ExprSemiring.JumpType;
+import de.tum.in.jmoped.underbone.ExprSemiring.Return;
 import de.tum.in.jmoped.underbone.ExprSemiring.Condition.ConditionType;
 import de.tum.in.wpds.Config;
 import de.tum.in.wpds.Fa;
@@ -598,6 +600,25 @@ public class VirtualMachine {
 					break;
 				}
 				
+				case JUMP: {
+					// Checks whether the invoke condition is fulfilled
+					if (!fulfillsCondition(d)) {
+						thisrule = false;
+						break;
+					}
+					
+					JumpType type = (JumpType) d.value;
+					if (type.equals(JumpType.ONE))
+						break;
+					
+					// JumpType.THROW
+					Number s0 = frame.stack.pop();
+					frame.stack.clear();
+					frame.stack.push(s0);
+					globals.put(Remopla.e, 0);
+					break;
+				}
+				
 				case LOAD: {
 					ExprSemiring.Local local = (ExprSemiring.Local) d.value;
 					frame.stack.push(frame.lv[local.index]);
@@ -700,16 +721,6 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case ONE: {
-					// Checks whether the invoke condition is fulfilled
-					if (!fulfillsCondition(d)) {
-						thisrule = false;
-						break;
-					}
-					
-					break;
-				}
-				
 				case POPPUSH: {
 					ExprSemiring.Poppush poppush = (ExprSemiring.Poppush) d.value;
 					for (int i = 0; i < poppush.pop; i++)
@@ -755,12 +766,21 @@ public class VirtualMachine {
 				}
 				
 				case RETURN: {
-					ExprSemiring.Return ret = (ExprSemiring.Return) d.value;
-					if (ret.something) {
+					Return ret = (Return) d.value;
+					if (ret.type == Return.Type.SOMETHING) {
 						retvar = frame.stack.pop();
-						if (ret.category.two())
+						if (ret.getCategory().two())
 							retvar = frame.stack.pop();
-					}
+					} 
+//					else if (ret.type == Return.Type.THROW) {
+//						int ptr = ((Number) frame.stack.peek()).intValue();
+//						int id = heap.get(ptr).intValue();
+//						if (ret.getThrowInfo().set.contains(id)) {
+//							thisrule = false;
+//							break;
+//						}
+//						globals.put(ret.getThrowInfo().var, ptr);
+//					}
 					frame = frames.pop();
 					break;
 				}
@@ -920,12 +940,15 @@ public class VirtualMachine {
 		if (A.aux == null) return true;
 		
 		Condition cond = (Condition) A.aux;
-		if (cond.type == ConditionType.CONTAINS) {
+		if (cond.type == ConditionType.CONTAINS || cond.type == ConditionType.NOTCONTAINS) {
 			
 			Set<Integer> set = (Set<Integer>) cond.value;
 			int ptr = ((Number) frame.stack.elementAt(frame.stack.size() - s)).intValue();
 			int id = heap.get(ptr).intValue();
-			return set.contains(id);
+			if (cond.type == ConditionType.CONTAINS)
+				return set.contains(id);
+			else
+				return !set.contains(id);
 		}
 		
 		int g = ((Number) globals.get((String) cond.value)).intValue();
@@ -949,7 +972,7 @@ public class VirtualMachine {
 			id = ((ExprSemiring.Invoke) A.value).nargs;
 			break;
 		case FIELDLOAD:
-		case ONE:
+		case JUMP:
 			id = 1;
 			break;
 		case FIELDSTORE:

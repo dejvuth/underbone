@@ -106,6 +106,11 @@ public class Remopla {
 	public static final String s = Fa.q_f;
 	
 	/**
+	 * Global variable indicating error
+	 */
+	public static final String e = "e";
+	
+	/**
 	 * The logger.
 	 */
 	private static Logger logger = Utils.getLogger(Remopla.class);
