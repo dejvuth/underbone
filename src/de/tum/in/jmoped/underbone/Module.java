@@ -8,6 +8,7 @@ import de.tum.in.jmoped.underbone.ExprSemiring.ArithType;
 import de.tum.in.jmoped.underbone.ExprSemiring.CategoryType;
 import de.tum.in.jmoped.underbone.ExprSemiring.Condition;
 import de.tum.in.jmoped.underbone.ExprSemiring.DupType;
+import de.tum.in.jmoped.underbone.ExprSemiring.JumpType;
 import de.tum.in.wpds.Config;
 import de.tum.in.wpds.Rule;
 import de.tum.in.wpds.Semiring;
@@ -397,7 +398,7 @@ public class Module {
 			case NEW: s = newexpr(itr, heapsize); toIterate = false; break;
 			case NEWARRAY: s = newarray(d, heapsize); break;
 			case NPE: break;
-			case ONE: s = one(itr); toIterate = false; break;
+			case JUMP: s = jump(itr); toIterate = false; break;
 			case POPPUSH: s = poppush(d); break;
 			case PRINT: s = skip(); break;
 			case PUSH: s = push(d); break;
@@ -617,7 +618,7 @@ public class Module {
 		
 		StringBuilder b = new StringBuilder();
 		switch (cond.type) {
-		case CONTAINS:
+		case CONTAINS: {
 			Set<Integer> set = (Set<Integer>) cond.value;
 			int count = 0;
 			for (Integer index : set) {
@@ -626,6 +627,17 @@ public class Module {
 				count++;
 			}
 			break;
+		}
+		case NOTCONTAINS: {
+			Set<Integer> set = (Set<Integer>) cond.value;
+			int count = 0;
+			for (Integer index : set) {
+				if (count > 0) Utils.append(b, " && ");
+				Utils.append(b, "%s[%s] != %d", heap, s(s), index);
+				count++;
+			}
+			break;
+		}
 		case ZERO:
 			Utils.append(b, "%s == 0", Remopla.mopedize((String) cond.value));
 			break;
@@ -726,8 +738,8 @@ public class Module {
 	private static String globalstore(ExprSemiring d) {
 		ExprSemiring.Field field = (ExprSemiring.Field) d.value;
 		return String.format("%s = %s[%s - %d], %s = %s - %d;", 
-				Remopla.mopedize(field.name), stack, sptr, field.category, 
-				sptr, sptr, field.category);
+				Remopla.mopedize(field.name), stack, sptr, field.category.intValue(), 
+				sptr, sptr, field.category.intValue());
 	}
 	
 	private static String heapload() {
@@ -975,30 +987,51 @@ public class Module {
 		return b.toString();
 	}
 	
-	private static String one(Iterator<Rule> itr) {
+//	private static void throwExpr(StringBuilder b, ExprSemiring.Return r) {
+//		Utils.append(b, "\t:: (%s != 0", s0());
+//		for (Integer i : r.getThrowInfo().set) {
+//			Utils.append(b, " && %s != %d", s0(), i);
+//		}
+//		Utils.append(b, ") -> %s = %s; return;%n", 
+//				Remopla.mopedize(r.getThrowInfo().var), s0());
+//	}
+	
+	private static String jump(Iterator<Rule> itr) {
 		StringBuilder b = new StringBuilder();
 		Utils.append(b, "if%n");
 		boolean npeprinted = false;
 		
 		String label = rule.getLabel();
 		do {
-			Condition c = (Condition) ((ExprSemiring) rule.getWeight()).aux;
-			boolean contains = (c == null) 
-				? false 
-				: (c.type == Condition.ConditionType.CONTAINS);
-			if (contains && !npeprinted) {
-				npe(s0());
-				npeprinted = true;
-			}
-			
-			Utils.append(b, "\t:: (");
-			if (contains)
-				Utils.append(b, "%s != 0 && (", s0());
-			b.append(fulfillsCondition(c, 1));
-			if (contains)
-				b.append(')');
-			Utils.append(b, ") -> goto %s;%n",
-					Remopla.mopedize(rule.getRightLabel()));
+			ExprSemiring expr = (ExprSemiring) rule.getWeight();
+//			if (expr.type == ExprType.RETURN) {	// Throw
+//				throwExpr(b, (ExprSemiring.Return) expr.value);
+//				continue;
+//			} else {	// expr.type == ExprType.ONE
+				JumpType type = (JumpType) expr.value;
+				Condition c = (Condition) expr.aux;
+				boolean contains = (c == null) 
+					? false 
+					: (c.type == Condition.ConditionType.CONTAINS);
+				if (contains && !npeprinted) {
+					npe(s0());
+					npeprinted = true;
+				}
+				
+				Utils.append(b, "\t:: (");
+				if (contains)
+					Utils.append(b, "%s != 0 && (", s0());
+				b.append(fulfillsCondition(c, 1));
+				if (contains)
+					b.append(')');
+				Utils.append(b, ") -> goto %s",
+						Remopla.mopedize(rule.getRightLabel()));
+				if (expr.type == ExprType.JUMP && ((JumpType) expr.value) == JumpType.THROW) {
+					Utils.append(b, ", %s[0] = %s[%s - 1], %s = 1, %s = 0", 
+							stack, stack, sptr, sptr, Remopla.e);
+				}
+				Utils.append(b, ";%n");
+//			}
 
 			// Next rule
 			if (itr.hasNext()) rule = itr.next();
@@ -1087,10 +1120,11 @@ public class Module {
 	
 	private static String returnexpr(ExprSemiring d) {
 		ExprSemiring.Return r = (ExprSemiring.Return) d.value;
-		if (r.something)
+		if (r.type == ExprSemiring.Return.Type.VOID)
+			return "return;";
+		else // if (r.type == ExprSemiring.Return.Type.SOMETHING)
 			return String.format("%s = %s[%s - %d]; return;", 
-					ret, stack, sptr, r.category.intValue());
-		return "return;";
+					ret, stack, sptr, r.getCategory().intValue());
 	}
 	
 	private static String skip() {

@@ -15,7 +15,9 @@ import net.sf.javabdd.BDD.BDDIterator;
 import de.tum.in.jmoped.underbone.ExprSemiring.ArithType;
 import de.tum.in.jmoped.underbone.ExprSemiring.Condition;
 import de.tum.in.jmoped.underbone.ExprSemiring.DupType;
+import de.tum.in.jmoped.underbone.ExprSemiring.Return;
 import de.tum.in.jmoped.underbone.ExprSemiring.Condition.ConditionType;
+import de.tum.in.jmoped.underbone.ExprSemiring.JumpType;
 import de.tum.in.wpds.CancelMonitor;
 import de.tum.in.wpds.DpnSat;
 import de.tum.in.wpds.Sat;
@@ -247,6 +249,9 @@ public class BDDSemiring implements Semiring {
 			
 		case IOOB:
 			return ioob(A);
+			
+		case JUMP:
+			return jump(A);
 		
 		// Pushes from local variable
 		case LOAD:
@@ -270,12 +275,6 @@ public class BDDSemiring implements Semiring {
 		case NPE:
 			return npe(A);
 		
-		// Identity
-		case ONE: {
-			BDD c = fulfillsCondition(A);
-			return new BDDSemiring(manager, c);
-		}
-		
 		case POPPUSH:
 			return poppush(A);
 		
@@ -286,42 +285,8 @@ public class BDDSemiring implements Semiring {
 		case PUSH:
 			return push(A);
 		
-		case RETURN: {
-			
-			BDD c;
-			ExprSemiring.Return ret = (ExprSemiring.Return) A.value;
-			if (ret.something) {
-				// Gets the pointer to the stack element
-				int sp = bdd.scanVar(spDom).intValue() - ret.category.intValue();
-				
-				// Prepares the pair: seDom -> retDom
-				BDDDomain seDom = manager.getStackDomain(sp);
-				BDDPairing pair = factory.makePair(seDom, manager.getRetVarDomain());
-				
-				// Updates the return variable
-				BDD d = bdd.id().replaceWith(pair);
-				c = manager.abstractLocals(d);
-				d.free();
-			} else {
-				c = manager.abstractLocals(bdd);
-			}
-//			c = manager.replaceG1L1withG2L2(c);
-			c.replaceWith(manager.getG1L1pairG2L2());
-			
-			// Debug: prints ret values
-//			log("\t\tret:");
-//			BDDIterator itr = manager.iterator(c, manager.getRetVarDomain());
-//			while (itr.hasNext()) {
-//				BDD d = itr.nextBDD();
-//				log(" %d", d.scanVar(manager.getRetVarDomain()));
-//				d.free();
-//			}
-//			log("%n");
-			
-//			Sat.logger.fine(String.format("bdd: %s%n", bdd.toStringWithDomains()));
-//			Sat.logger.fine(String.format("c: %s%n", c.toStringWithDomains()));
-			return new BDDSemiring(manager, c);
-		}
+		case RETURN:
+			return returnExpr(A);
 		
 		// Pops to local variable
 		case STORE:
@@ -1313,6 +1278,47 @@ public class BDDSemiring implements Semiring {
 		return new BDDSemiring(manager, c);
 	}
 	
+	private BDDSemiring jump(ExprSemiring A) {
+		BDD c = fulfillsCondition(A);
+		if (c.isZero())
+			return new BDDSemiring(manager, c);
+		
+		JumpType type = (JumpType) A.value;
+		if (type.equals(JumpType.ONE))
+			return new BDDSemiring(manager, c);
+		else {	// JumpType.THROW
+			
+			// Gets stack domains
+			BDDDomain spdom = manager.getStackPointerDomain();
+			int sp = bdd.scanVar(spdom).intValue() - 1;
+			BDDDomain s0dom = manager.getStackDomain(sp);
+			
+			/*
+			 *  Abstracts the error var, and if sp > 0 
+			 *  also abstracts all stack elements below sp, and the stack pointer.
+			 */
+			BDDDomain[] doms = new BDDDomain[sp + ((sp > 0) ? 2 : 1)];
+			for (int i = 0; i < sp; i++)
+				doms[i] = manager.getStackDomain(i);
+			doms[sp] = manager.getGlobalVarDomain(Remopla.e);
+			if (sp > 0) doms[sp + 1] = spdom;
+					
+			BDD d;
+			if (sp > 0) d = abstractVars(c, doms);
+			else d = abstractVars(c, doms[sp]);
+			
+			// Replaces the bottom element with s0 and set the stack pointer to 1
+			if (sp > 0) {
+				d.replaceWith(bdd.getFactory().makePair(s0dom, doms[0]))
+						.andWith(spdom.ithVar(1));
+			}
+			
+			// Resets the error status
+			d.andWith(doms[sp].ithVar(0));
+			return new BDDSemiring(manager, d);
+		}
+	}
+	
 	private BDDSemiring load(ExprSemiring A) {
 		ExprSemiring.Local local = (ExprSemiring.Local) A.value;
 		BDD c;
@@ -2010,6 +2016,93 @@ public class BDDSemiring implements Semiring {
 		return new BDDSemiring(manager, c);
 	}
 	
+	private BDDSemiring returnExpr(ExprSemiring A) {
+		BDD c;
+		Return ret = (Return) A.value;
+		if (ret.type == Return.Type.VOID) {
+			c = manager.abstractLocals(bdd);
+		} else {	// if (ret.type == Return.Type.SOMETHING) {
+			// Gets the pointer to the stack element
+			BDDDomain spdom = manager.getStackPointerDomain();
+			int sp = bdd.scanVar(spdom).intValue() - ret.getCategory().intValue();
+			
+			// Prepares the pair: seDom -> retDom
+			BDDDomain seDom = manager.getStackDomain(sp);
+			BDDPairing pair = bdd.getFactory().makePair(seDom, manager.getRetVarDomain());
+			
+			// Updates the return variable
+			BDD d = bdd.id().replaceWith(pair);
+			c = manager.abstractLocals(d);
+			d.free();
+		} 
+//		else {	// Return.Type.THROW
+//			Return.ThrowInfo t = ret.getThrowInfo();
+//			
+//			// Gets the stack pointer
+//			BDDDomain spdom = manager.getStackPointerDomain();
+//			int sp = bdd.scanVar(spdom).intValue();
+//			
+//			// Gets the stack element where the instance is stored
+//			BDDDomain sdom = manager.getStackDomain(sp - 1);
+//			
+//			BDDDomain vdom = manager.getGlobalVarDomain(t.var);
+//			BDD d = abstractVars(bdd, vdom);
+//			
+//			// Loops for all possible instances
+//			BDDIterator sitr = manager.iterator(d, sdom);
+//			c = bdd.getFactory().zero();
+//			while (sitr.hasNext()) {
+//				
+//				// Gets an instance
+//				BDD e = sitr.nextBDD();
+//				long s = e.scanVar(sdom).longValue();
+//				e.free();
+//				
+//				// Gets all possible ids for this instance
+//				BDDDomain hdom = manager.getHeapDomain(s);
+//				e = d.id().andWith(sdom.ithVar(s));
+//				BDDIterator hitr = manager.iterator(e, hdom);
+//				while (hitr.hasNext()) {
+//					
+//					// Gets an id
+//					BDD f = hitr.nextBDD();
+//					int h = f.scanVar(hdom).intValue();
+//					f.free();
+//					
+//					// Bypasses if the id is not contained in the condition value
+//					if (t.set.contains(h)) {
+//						log("\t\tbypassing id %d%n", h);
+//						continue;
+//					}
+//					
+//					// Prunes the bdd for this id
+//					c.orWith(d.id().andWith(sdom.ithVar(s))
+//							.andWith(hdom.ithVar(h))
+//							.andWith(vdom.ithVar(s)));
+//				}
+//				e.free();
+//			}
+//			if (c.isZero())
+//				return new BDDSemiring(manager, c);
+//			
+//		}
+		c.replaceWith(manager.getG1L1pairG2L2());
+		
+		// Debug: prints ret values
+//		log("\t\tret:");
+//		BDDIterator itr = manager.iterator(c, manager.getRetVarDomain());
+//		while (itr.hasNext()) {
+//			BDD d = itr.nextBDD();
+//			log(" %d", d.scanVar(manager.getRetVarDomain()));
+//			d.free();
+//		}
+//		log("%n");
+		
+//		Sat.logger.fine(String.format("bdd: %s%n", bdd.toStringWithDomains()));
+//		Sat.logger.fine(String.format("c: %s%n", c.toStringWithDomains()));
+		return new BDDSemiring(manager, c);
+	}
+	
 	private BDDSemiring store(ExprSemiring A) {
 		ExprSemiring.Local local = (ExprSemiring.Local) A.value;
 		BDD c;
@@ -2326,7 +2419,8 @@ public class BDDSemiring implements Semiring {
 		}
 		
 		Condition cond = (Condition) A.aux;
-		if (cond.type == ConditionType.CONTAINS) {
+		if (cond.type == ConditionType.CONTAINS 
+				|| cond.type == ConditionType.NOTCONTAINS) {
 			
 			Set<Integer> set = (Set<Integer>) cond.value;
 			
@@ -2359,7 +2453,11 @@ public class BDDSemiring implements Semiring {
 					f.free();
 					
 					// Bypasses if the id is not contained in the condition value
-					if (!set.contains(h)) {
+					if (cond.type == ConditionType.CONTAINS && !set.contains(h)) {
+						log("\t\tbypassing id %d%n", h);
+						continue;
+					}
+					if (cond.type == ConditionType.NOTCONTAINS && set.contains(h)) {
 						log("\t\tbypassing id %d%n", h);
 						continue;
 					}
@@ -2397,7 +2495,7 @@ public class BDDSemiring implements Semiring {
 			id = ((ExprSemiring.Invoke) A.value).nargs;
 			break;
 		case FIELDLOAD:
-		case ONE:
+		case JUMP:
 			id = 1;
 			break;
 		case FIELDSTORE:

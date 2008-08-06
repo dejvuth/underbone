@@ -245,9 +245,11 @@ public enum ExprType {
 	NPE,
 	
 	/**
-	 * Changes nothing.
+	 * Jumps.
+	 * The field <code>value</code> is of type {@link ExprSemiring.JumpType}.
+	 * The field <code>aux</code> is of type {@link ExprSemiring.Condition}.
 	 */
-	ONE,
+	JUMP,
 	
 	/**
 	 * Pops and pushes the stack.
