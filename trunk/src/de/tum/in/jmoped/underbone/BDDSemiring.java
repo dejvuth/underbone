@@ -162,7 +162,6 @@ public class BDDSemiring implements Semiring {
 		if (bdd.isZero()) return new BDDSemiring(manager, factory.zero());
 		
 		ExprSemiring A = (ExprSemiring) a;
-		BDDDomain spDom = manager.getStackPointerDomain();
 		
 		log(bdd);
 //		logRaw(bdd);
@@ -508,11 +507,14 @@ public class BDDSemiring implements Semiring {
 		BDD c = bdd.id().andWith(d);
 		
 		// Abstract stack
-		d = abstractVars(c, spdom, s0dom, s1dom);
+		ExprSemiring.CategoryType category = (ExprSemiring.CategoryType) A.value;
+		if (category.one())
+			d = abstractVars(c, spdom, s0dom, s1dom);
+		else
+			d = abstractVars(c, s0dom, s1dom);
 		c.free();
 		
 		// Update stack
-		ExprSemiring.CategoryType category = (ExprSemiring.CategoryType) A.value;
 		d.replaceWith(factory.makePair(tdom, s1dom));
 		if (category.one())
 			d.andWith(spdom.ithVar(sp - 1));
@@ -1708,7 +1710,7 @@ public class BDDSemiring implements Semiring {
 	}
 	
 	/**
-	 * Returns the BDD with variables specified <code>dom</code>
+	 * Returns the BDD with variables specified by <code>dom</code>
 	 * representing <code>value</code>.
 	 * 
 	 * @param value the value.

@@ -127,8 +127,8 @@ public class VirtualMachine {
 		PdsSat sat = new PdsSat(pds);
 		Fa post = (Fa) sat.poststar(fa);
 		Set<String> labels = post.getLabels();
-		for (String label : labels)
-			log("%s%n", label);
+//		for (String label : labels)
+//			log("%s%n", label);
 		
 		// Creates Remopla listener and wraps the monitor
 		RemoplaListener listener = remopla.getRemoplaListener();
@@ -158,6 +158,7 @@ public class VirtualMachine {
 		heap.add(0);
 		
 		Heap heapsave = null;
+		HashMap<String, Number> globalssave = null;
 		RawArgument raw = null;
 		raws = new HashMap<String, List<RawArgument>>();
 		
@@ -270,15 +271,24 @@ public class VirtualMachine {
 					
 					// Checks IOOB
 					int length = arraylength(s1).intValue();
+//					log("length: %d, s0: %d%n", length, s0);
 					if (ioob(length, s0, rule.left.w[0], listener, raw, frames)) 
 						break;
 					
 					// Pushes
 					frame.stack.push(heap.get(indexOfArrayElement(s1, s0)));
+					
+					// Category 2
+					if (((ExprSemiring.CategoryType) d.value).two())
+						frame.stack.push(0);
 					break;
 				}
 				
 				case ARRAYSTORE: {
+					// Category 2
+					if (((ExprSemiring.CategoryType) d.value).two())
+						frame.pop();
+					
 					// Checks NPE
 					Number s0 = frame.pop();			// value
 					int s1 = frame.pop().intValue();	// index
@@ -380,6 +390,7 @@ public class VirtualMachine {
 					if (field.categoryTwo())
 						s0 = frame.pop();
 					int s1 = frame.pop().intValue();
+//					System.out.printf("s1: %d, s0: %d%n", s1, s0.intValue());
 					if (npe(s1, rule.left.w[0], listener, raw, frames)) break;
 					
 					// Stores s0 to heap
@@ -443,6 +454,7 @@ public class VirtualMachine {
 				
 				case HEAPRESTORE: {
 					heap = heapsave;
+					globals = globalssave;
 					break;
 				}
 				
@@ -455,6 +467,7 @@ public class VirtualMachine {
 				case HEAPSAVE: {
 					heapsave = new Heap((int) (1.4*heap.size()));
 					heapsave.addAll(heap);
+					globalssave = new HashMap<String, Number>(globals);
 					break;
 				}
 				
@@ -597,6 +610,7 @@ public class VirtualMachine {
 						thisrule = false;
 						break;
 					}
+					log("\tArrayIndexOutOfBoundException%n");
 					break;
 				}
 				
@@ -787,9 +801,13 @@ public class VirtualMachine {
 				
 				case STORE: {
 					ExprSemiring.Local local = (ExprSemiring.Local) d.value;
-					frame.lv[local.index] = frame.pop();
-					if (local.category.two())
+					if (local.category.one()) {
+						frame.lv[local.index] = frame.pop();
+					}
+					else {
 						frame.lv[local.index + 1] = frame.pop();
+						frame.lv[local.index] = frame.pop();
+					}
 					break;
 				}
 				
@@ -1010,7 +1028,7 @@ public class VirtualMachine {
 		
 		public String toString() {
 			
-			return String.format("label: %s, lv:%s, stack:%s", 
+			return String.format("label: %s, %nlv:%s, %nstack:%s", 
 					label, Arrays.toString(lv), stack);
 		}
 	}
@@ -1044,6 +1062,11 @@ public class VirtualMachine {
 			heap.set(index, element);
 		}
 		
+		/**
+		 * Adds all elements from <code>another</code> heap.
+		 * 
+		 * @param another another heap.
+		 */
 		public void addAll(Heap another) {
 			heap.addAll(another.heap);
 		}

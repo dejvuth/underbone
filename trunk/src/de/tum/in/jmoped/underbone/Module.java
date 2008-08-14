@@ -357,6 +357,9 @@ public class Module {
 		Iterator<Rule> itr = rules.iterator();
 		rule = itr.next();
 		while (rule != null) {
+			
+//			System.out.println(rule);
+			
 			// To be iterated?
 			boolean toIterate = true;
 			
@@ -408,10 +411,13 @@ public class Module {
 			}
 			
 			if (s != null) {
-				if (LabelUtils.getOffset(label) == 0)
+				if (LabelUtils.getOffset(label) == 0) {
 					Utils.append(out, "%s%n", s);
-				else
+//					System.out.printf("%s%n", s);
+				} else {
 					Utils.append(out, "%s: %s%n", Remopla.mopedize(label), s);
+//					System.out.printf("%s: %s%n", Remopla.mopedize(label), s);
+				}
 			}
 			
 			// Iterates if toIterate is true
@@ -726,7 +732,7 @@ public class Module {
 				stack, sptr, Remopla.mopedize(field.name));
 		if (field.categoryTwo())
 			Utils.append(b, ", %s[%s + 1] = 0", stack, sptr);
-		Utils.append(b, ", %s = %s + %d;", sptr, sptr, field.category);
+		Utils.append(b, ", %s = %s + %d;", sptr, sptr, field.category.intValue());
 		return b.toString();
 	}
 	
@@ -867,23 +873,29 @@ public class Module {
 			else rule = null;
 		} while (rule != null && rule.getLabel().equals(label));
 		
-		// GLOBALLOAD, GLOBALSTORE
+		/*
+		 * FIXME Very dirty hack for handling static initializer, where
+		 * GLOBALLOAD or GLOBALSTORE follows.
+		 */
 		if (rule != null) {
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
 			if (d.type == ExprType.GLOBALLOAD || d.type == ExprType.GLOBALSTORE) {
-				Utils.append(b, "\t\t%s%n", 
-						(d.type == ExprType.GLOBALLOAD) ? globalload(d) : globalstore(d));
-				
-				// Next rule guarantees to be either globalload or globalstore
-				rule = itr.next();
-				d = (ExprSemiring) rule.getWeight();
-				Utils.append(b, "\t:: (");
-				b.append(fulfillsCondition((Condition) d.aux, 0));
-				Utils.append(b, ") -> %s%n;", 
-						(d.type == ExprType.GLOBALLOAD) ? globalload(d) : globalstore(d));
-				
-				// Next rule
-				rule = itr.next();
+				ExprSemiring.Field f = (ExprSemiring.Field) d.value;
+				if (!f.name.equals(Remopla.e)) {
+					Utils.append(b, "\t\t%s%n", 
+							(d.type == ExprType.GLOBALLOAD) ? globalload(d) : globalstore(d));
+					
+					// Next rule guarantees to be either globalload or globalstore
+					rule = itr.next();
+					d = (ExprSemiring) rule.getWeight();
+					Utils.append(b, "\t:: (");
+					b.append(fulfillsCondition((Condition) d.aux, 0));
+					Utils.append(b, ") -> %s%n;", 
+							(d.type == ExprType.GLOBALLOAD) ? globalload(d) : globalstore(d));
+					
+					// Next rule
+					rule = itr.next();
+				}
 			}
 		}
 		

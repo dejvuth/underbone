@@ -206,6 +206,8 @@ public class Remopla {
 	 */
 	public Fa coverage(String bddpackage, int nodenum, int cachesize, ProgressMonitor monitor) {
 		
+		vm = null;
+		
 		// First post*
 		Pds pds = getPds();
 		fa = new Fa();
@@ -276,6 +278,8 @@ public class Remopla {
 	public void coverage(String bddpackage, int nodenum, int cachesize, 
 			int n, int k, boolean lazy, ProgressMonitor monitor) {
 		
+		vm = null;
+		
 		// First post*
 		Pds pds = getPds();
 		info("Total: %d labels%n", pds.getStackSymbols().size());
@@ -323,6 +327,7 @@ public class Remopla {
 	 */
 	public void run(ProgressMonitor monitor) {
 		
+		post = null;
 		vm = new VirtualMachine(this);
 		vm.run(monitor);
 	}
