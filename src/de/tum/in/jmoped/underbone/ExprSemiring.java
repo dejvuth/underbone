@@ -216,6 +216,9 @@ public class ExprSemiring extends NullSemiring {
 			 * The condition is fulfilled if the class id is contained in
 			 * the set. Note that the class id is obtained from the heap
 			 * where the stack representing the first argument points to.
+			 * Note that this different from {@link Unaryop.Type#CONTAINS}
+			 * which considers the directly the value of the top-of-stack 
+			 * (i.e. the top-of-stack is not a pointer).
 			 */
 			CONTAINS,
 			
@@ -304,6 +307,9 @@ public class ExprSemiring extends NullSemiring {
 		}
 	}
 	
+	/**
+	 * Value for {@link ExprType#IF}
+	 */
 	public static class If {
 		
 		Type type;
@@ -328,6 +334,7 @@ public class ExprSemiring extends NullSemiring {
 		
 		/**
 		 * Determines equality with the given value.
+		 * Used with {@link Type#IS}.
 		 * 
 		 * @param value the value.
 		 */
@@ -351,6 +358,12 @@ public class ExprSemiring extends NullSemiring {
 			return value == null;
 		}
 		
+		/**
+		 * Gets the constant value to be compared with the top-of-stack.
+		 * Used with {@link Type#IS}. 
+		 * 
+		 * @return the constant value.
+		 */
 		public int getValue() {
 			return (Integer) value;
 		}
@@ -401,6 +414,7 @@ public class ExprSemiring extends NullSemiring {
 	
 	/**
 	 * Invoke information.
+	 * Value for {@link ExprType#INVOKE}.
 	 */
 	public static class Invoke {
 		
@@ -443,8 +457,20 @@ public class ExprSemiring extends NullSemiring {
 		}
 	}
 	
+	/**
+	 * Value for {@link ExprType#JUMP}.
+	 */
 	public static enum JumpType {
-		ONE, THROW;
+		/**
+		 * Unconditional jump
+		 */
+		ONE, 
+		
+		/**
+		 * Catches an exception. The top-of-stack becomes the only element.
+		 * and resets the error status {@link Remopla#e} to 0.
+		 */
+		THROW;
 	}
 	
 	/**
@@ -636,6 +662,11 @@ public class ExprSemiring extends NullSemiring {
 			this.push = push;
 		}
 		
+		/**
+		 * Returns <code>true</code> if neither push nor pop.
+		 * 
+		 * @return <code>true</code> if neither push nor pop.
+		 */
 		public boolean nochange() {
 			return pop == 0 && push == 0;
 		}
@@ -743,11 +774,20 @@ public class ExprSemiring extends NullSemiring {
 		/**
 		 * Category 1 or 2
 		 */
-		CategoryType category;
+		public CategoryType category;
 		
 		private Object value;
-		Number next;
-		Number to;
+		public Number next;
+		public Number to;
+		
+		/**
+		 * Creates a deterministic value of type 1.
+		 * 
+		 * @param value the value.
+		 */
+		public Value(Number value) {
+			this(CategoryType.ONE, value);
+		}
 		
 		/**
 		 * Creates a nondeterministic value.
@@ -873,7 +913,7 @@ public class ExprSemiring extends NullSemiring {
 			if (type != Type.CONTAINS)
 				throw new RemoplaError("Internal error: " +
 						"A Unary operation of type CONTAINS expected");
-			if (set == null || set.isEmpty())
+			if (set == null)
 				throw new RemoplaError("Internal error: " +
 						"A set of integers expected");
 			this.type = type;
@@ -934,7 +974,9 @@ public class ExprSemiring extends NullSemiring {
 			
 			/**
 			 * Pushes one the set in <code>aux</code> contains the top-of-stack;
-			 * or zero otherwise.
+			 * or zero otherwise. Note that this is different from 
+			 * {@link Condition.ConditionType#CONTAINS} which considers
+			 * the object id pointed the top-of-stack.
 			 */
 			CONTAINS(CategoryType.ONE, CategoryType.ONE);
 			

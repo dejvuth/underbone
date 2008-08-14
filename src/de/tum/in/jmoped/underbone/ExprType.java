@@ -133,7 +133,7 @@ public enum ExprType {
 	
 	/**
 	 * Stores constant into global variable.
-	 * The field <code>value</code> determines the global variable name.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Field}.
 	 * The field <code>aux</code> determines the constant.
 	 */
 	GLOBALPUSH,
@@ -182,7 +182,8 @@ public enum ExprType {
 	HEAPSAVE,
 	
 	/**
-	 * Compares the top-of-stack with zero.
+	 * Compares the top-of-stack with a constant.
+	 * The field <code>value</code> is of type {@link ExprSemiring.If}.
 	 */
 	IF,
 	
@@ -199,6 +200,7 @@ public enum ExprType {
 	
 	/**
 	 * Invokes a module.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Invoke}.
 	 */
 	INVOKE,
 	
@@ -253,7 +255,7 @@ public enum ExprType {
 	
 	/**
 	 * Pops and pushes the stack.
-	 * The field <code>value</code> is of type {@link ExprSemiring.Newarray}.
+	 * The field <code>value</code> is of type {@link ExprSemiring.Poppush}.
 	 * The virtual machine always pushes zero.
 	 */
 	POPPUSH,
