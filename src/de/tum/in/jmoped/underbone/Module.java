@@ -4,11 +4,24 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Set;
 
-import de.tum.in.jmoped.underbone.ExprSemiring.ArithType;
-import de.tum.in.jmoped.underbone.ExprSemiring.CategoryType;
-import de.tum.in.jmoped.underbone.ExprSemiring.Condition;
-import de.tum.in.jmoped.underbone.ExprSemiring.DupType;
-import de.tum.in.jmoped.underbone.ExprSemiring.JumpType;
+import de.tum.in.jmoped.underbone.expr.Arith;
+import de.tum.in.jmoped.underbone.expr.Category;
+import de.tum.in.jmoped.underbone.expr.Comp;
+import de.tum.in.jmoped.underbone.expr.Condition;
+import de.tum.in.jmoped.underbone.expr.Dup;
+import de.tum.in.jmoped.underbone.expr.Field;
+import de.tum.in.jmoped.underbone.expr.If;
+import de.tum.in.jmoped.underbone.expr.Inc;
+import de.tum.in.jmoped.underbone.expr.Invoke;
+import de.tum.in.jmoped.underbone.expr.Jump;
+import de.tum.in.jmoped.underbone.expr.Local;
+import de.tum.in.jmoped.underbone.expr.Monitorenter;
+import de.tum.in.jmoped.underbone.expr.New;
+import de.tum.in.jmoped.underbone.expr.Newarray;
+import de.tum.in.jmoped.underbone.expr.Poppush;
+import de.tum.in.jmoped.underbone.expr.Return;
+import de.tum.in.jmoped.underbone.expr.Unaryop;
+import de.tum.in.jmoped.underbone.expr.Value;
 import de.tum.in.wpds.Config;
 import de.tum.in.wpds.Rule;
 import de.tum.in.wpds.Semiring;
@@ -133,7 +146,7 @@ public class Module {
 	 * @param y the left-hand-side stack symbol.
 	 * @param t the type of the weight for this rule.
 	 */
-	public void addRule(String y, ExprType t) {
+	public void addRule(String y, int t) {
 		
 		addRule(y, new ExprSemiring(t));
 	}
@@ -147,7 +160,7 @@ public class Module {
 	 * @param t the type of the weight for this rule.
 	 * @param w the right-hand-side stack symbols.
 	 */
-	public void addRule(String y, ExprType t, String w) {
+	public void addRule(String y, int t, String w) {
 		
 		addRule(y, new ExprSemiring(t), w);
 	}
@@ -163,7 +176,7 @@ public class Module {
 	 * @param v the value of the weight for this rule.
 	 * @param w the right-hand-side stack symbols.
 	 */
-	public void addRule(String y, ExprType t, Object v, String w) {
+	public void addRule(String y, int t, Object v, String w) {
 		
 		addRule(y, new ExprSemiring(t, v), w);
 	}
@@ -179,7 +192,7 @@ public class Module {
 	 * @param v the value of the weight for this rule.
 	 * @param w the right-hand-side stack symbols.
 	 */
-	public void addRule(String y, ExprType t, Object v1, Object v2, String w) {
+	public void addRule(String y, int t, Object v1, Object v2, String w) {
 		
 		addRule(y, new ExprSemiring(t, v1, v2), w);
 	}
@@ -252,7 +265,7 @@ public class Module {
 		for (Rule r : rules) {
 			ExprSemiring d = (ExprSemiring) r.getWeight();
 			if (d.type == ExprType.CONSTLOAD || d.type == ExprType.CONSTSTORE) {
-				set.add(((ExprSemiring.Field) d.value).name);
+				set.add(((Field) d.value).getName());
 			}
 		}
 	}
@@ -374,40 +387,40 @@ public class Module {
 			String s = null;
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
 			switch (d.type) {
-			case ARITH: s = arith(d); break;
-			case ARRAYLENGTH: s = arraylength(); break;
-			case ARRAYLOAD: s = arrayload(); break;
-			case ARRAYSTORE: s = arraystore(); break;
-			case CONSTLOAD: s = constload(d); break;
-			case CONSTSTORE: s = conststore(d); break;
-			case DUP: s = dup(d); break;
-			case ERROR: s = error(); break;
-			case FIELDLOAD: s = fieldload(itr); toIterate = false; break;
-			case FIELDSTORE: s = fieldstore(itr); toIterate = false; break;
-			case GETRETURN : s = getreturn(d); break;
-			case GLOBALLOAD: s = globalload(d); break;
-			case GLOBALPUSH: s = globalpush(d); break;
-			case GLOBALSTORE: s = globalstore(d); break;
-			case HEAPLOAD: s = heapload(); break;
-			case HEAPOVERFLOW: break;
-			case IF: s = ifexpr(itr); toIterate = false; break;
-			case IFCMP: s = ifcmp(itr); toIterate = false; break;
-			case INC: s = inc(d); break;
-			case INVOKE: s = invoke(itr); toIterate = false; break;
-			case IOOB: break;
-			case LOAD: s = load(d); break;
-			case MONITORENTER: s = monitorenter(d); break;
-			case MONITOREXIT: s = monitorexit(); break;
-			case NEW: s = newexpr(itr, heapsize); toIterate = false; break;
-			case NEWARRAY: s = newarray(d, heapsize); break;
-			case NPE: break;
-			case JUMP: s = jump(itr); toIterate = false; break;
-			case POPPUSH: s = poppush(d); break;
-			case PRINT: s = skip(); break;
-			case PUSH: s = push(d); break;
-			case RETURN: s = returnexpr(d); break;
-			case STORE: s = store(d); break;
-			case UNARYOP: s = unaryop(d); break;
+			case ExprType.ARITH: s = arith(d); break;
+			case ExprType.ARRAYLENGTH: s = arraylength(); break;
+			case ExprType.ARRAYLOAD: s = arrayload(); break;
+			case ExprType.ARRAYSTORE: s = arraystore(); break;
+			case ExprType.CONSTLOAD: s = constload(d); break;
+			case ExprType.CONSTSTORE: s = conststore(d); break;
+			case ExprType.DUP: s = dup(d); break;
+			case ExprType.ERROR: s = error(); break;
+			case ExprType.FIELDLOAD: s = fieldload(itr); toIterate = false; break;
+			case ExprType.FIELDSTORE: s = fieldstore(itr); toIterate = false; break;
+			case ExprType.GETRETURN : s = getreturn(d); break;
+			case ExprType.GLOBALLOAD: s = globalload(d); break;
+			case ExprType.GLOBALPUSH: s = globalpush(d); break;
+			case ExprType.GLOBALSTORE: s = globalstore(d); break;
+			case ExprType.HEAPLOAD: s = heapload(); break;
+			case ExprType.HEAPOVERFLOW: break;
+			case ExprType.IF: s = ifexpr(itr); toIterate = false; break;
+			case ExprType.IFCMP: s = ifcmp(itr); toIterate = false; break;
+			case ExprType.INC: s = inc(d); break;
+			case ExprType.INVOKE: s = invoke(itr); toIterate = false; break;
+			case ExprType.IOOB: break;
+			case ExprType.LOAD: s = load(d); break;
+			case ExprType.MONITORENTER: s = monitorenter(d); break;
+			case ExprType.MONITOREXIT: s = monitorexit(); break;
+			case ExprType.NEW: s = newexpr(itr, heapsize); toIterate = false; break;
+			case ExprType.NEWARRAY: s = newarray(d, heapsize); break;
+			case ExprType.NPE: break;
+			case ExprType.JUMP: s = jump(itr); toIterate = false; break;
+			case ExprType.POPPUSH: s = poppush(d); break;
+			case ExprType.PRINT: s = skip(); break;
+			case ExprType.PUSH: s = push(d); break;
+			case ExprType.RETURN: s = returnexpr(d); break;
+			case ExprType.STORE: s = store(d); break;
+			case ExprType.UNARYOP: s = unaryop(d); break;
 			}
 			
 			if (s != null) {
@@ -468,12 +481,12 @@ public class Module {
 	}
 	
 	private static String arith(ExprSemiring d) {
-		ArithType type = (ArithType) d.value;
+		Arith arith = (Arith) d.value;
 		String op = null;
-		switch (type) {
-		case ADD: op = "+"; break;
-		case AND: op = "-"; break;
-		case CMP:
+		switch (arith.getType()) {
+		case Arith.ADD: op = "+"; break;
+		case Arith.AND: op = "-"; break;
+		case Arith.CMP:
 			StringBuilder b = new StringBuilder();
 			Utils.append(b, "if%n");
 			Utils.append(b, "\t:: (%s[%s - 2] > %s[%s - 1]) -> %s[%s - 1] = 1, %s = %s - 1;%n", 
@@ -484,23 +497,23 @@ public class Module {
 					stack, sptr, stack, sptr, stack, sptr, sptr, sptr);
 			Utils.append(b, "fi;");
 			return b.toString();
-		case DIV: op = "/"; break;
-		case MUL: op = "*"; break;
-		case OR: op = "|"; break;
-		case REM: op = "%"; break;
-		case SHL: op = "<<"; break;
-		case SHR: op = ">>"; break;
-		case SUB: op = "-"; break;
-		case USHR: op = ">>>"; break;
-		case XOR: op = "^"; break;
+		case Arith.DIV: op = "/"; break;
+		case Arith.MUL: op = "*"; break;
+		case Arith.OR: op = "|"; break;
+		case Arith.REM: op = "%"; break;
+		case Arith.SHL: op = "<<"; break;
+		case Arith.SHR: op = ">>"; break;
+		case Arith.SUB: op = "-"; break;
+		case Arith.USHR: op = ">>>"; break;
+		case Arith.XOR: op = "^"; break;
 		default:
 			throw new RemoplaError("Cannot Translate floating points into Remopla.");
 		}
-		int category = ((CategoryType) d.aux).intValue();
+		int cat = arith.getCategory().intValue();
 		return String.format("%s[%s - %d] = %s[%s - %d] %s %s[%s - %d], %s = %s - %d;", 
-				stack, sptr, 2*category, 
-				stack, sptr, 2*category, op, stack, sptr, category, 
-				sptr, sptr, category);
+				stack, sptr, 2*cat, 
+				stack, sptr, 2*cat, op, stack, sptr, cat, 
+				sptr, sptr, cat);
 	}
 	
 	private static String arraylength(String arrayref) {
@@ -568,16 +581,16 @@ public class Module {
 	
 	private static String constload(ExprSemiring d) {
 		return String.format("%s[%s] = %s, %s = %s + 1;", 
-				stack, sptr, Remopla.mopedize(((ExprSemiring.Field) d.value).name), sptr, sptr);
+				stack, sptr, Remopla.mopedize(((Field) d.value).getName()), sptr, sptr);
 	}
 	
 	private static String conststore(ExprSemiring d) {
 		return String.format("%s = %s, %s = %s - 1;", 
-				Remopla.mopedize(((ExprSemiring.Field) d.value).name), s0(), sptr, sptr);
+				Remopla.mopedize(((Field) d.value).getName()), s0(), sptr, sptr);
 	}
 	
 	private static String dup(ExprSemiring d) {
-		DupType dup = (DupType) d.value;
+		Dup dup = (Dup) d.value;
 		switch (dup) {
 		case DUP: {
 			return String.format("%s[%s] = %s, %s = %s + 1;",
@@ -623,9 +636,9 @@ public class Module {
 			return new StringBuilder("true");
 		
 		StringBuilder b = new StringBuilder();
-		switch (cond.type) {
-		case CONTAINS: {
-			Set<Integer> set = (Set<Integer>) cond.value;
+		switch (cond.getType()) {
+		case Condition.CONTAINS: {
+			Set<Integer> set = cond.getSetValue();
 			int count = 0;
 			for (Integer index : set) {
 				if (count > 0) Utils.append(b, " || ");
@@ -634,8 +647,8 @@ public class Module {
 			}
 			break;
 		}
-		case NOTCONTAINS: {
-			Set<Integer> set = (Set<Integer>) cond.value;
+		case Condition.NOTCONTAINS: {
+			Set<Integer> set = cond.getSetValue();
 			int count = 0;
 			for (Integer index : set) {
 				if (count > 0) Utils.append(b, " && ");
@@ -644,11 +657,11 @@ public class Module {
 			}
 			break;
 		}
-		case ZERO:
-			Utils.append(b, "%s == 0", Remopla.mopedize((String) cond.value));
+		case Condition.ZERO:
+			Utils.append(b, "%s == 0", Remopla.mopedize(cond.getStringValue()));
 			break;
-		case ONE:
-			Utils.append(b, "%s == 1", Remopla.mopedize((String) cond.value));
+		case Condition.ONE:
+			Utils.append(b, "%s == 1", Remopla.mopedize(cond.getStringValue()));
 			break;
 		}
 		
@@ -669,9 +682,9 @@ public class Module {
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
 			b.append(fulfillsCondition((Condition) d.aux, 1));
 			
-			ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+			Field field = (Field) d.value;
 			Utils.append(b, ")) -> %s = %s[%s + %d]", 
-					s0(), heap, s0(), field.id);
+					s0(), heap, s0(), field.getId());
 			if (field.categoryTwo()) {
 				Utils.append(b, ", %s[%s + 1] = 0, %s = %s + 1", 
 						stack, sptr, sptr, sptr);
@@ -698,12 +711,12 @@ public class Module {
 		do {
 			Utils.append(b, "\t:: (%s != 0 && (", s1());
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
-			ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+			Field field = (Field) d.value;
 			boolean two = field.categoryTwo();
 			b.append(fulfillsCondition((Condition) d.aux, two ? 3 : 2));
 			
 			Utils.append(b, ")) -> %s[%s + %d] = %s, %s = %s - 2;%n", 
-					heap, two ? s2() : s1(), field.id, 
+					heap, two ? s2() : s1(), field.getId(), 
 					two ? s1() : s0(),
 					sptr, sptr, two ? 3 : 2);
 
@@ -716,7 +729,7 @@ public class Module {
 	}
 	
 	private static String getreturn(ExprSemiring d) {
-		ExprSemiring.CategoryType category = (ExprSemiring.CategoryType) d.value;
+		Category category = (Category) d.value;
 		StringBuilder b = new StringBuilder();
 		Utils.append(b, "%s[%s] = %s", stack, sptr, ret);
 		if (category.two())
@@ -726,13 +739,17 @@ public class Module {
 	}
 	
 	private static String globalload(ExprSemiring d) {
-		ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+		Field field = (Field) d.value;
 		StringBuilder b = new StringBuilder();
+		Utils.append(b, "if%n");
+		Utils.append(b, "\t:: (%s) -> ", fulfillsCondition((Condition) d.aux, 0));
 		Utils.append(b, "%s[%s] = %s", 
-				stack, sptr, Remopla.mopedize(field.name));
+				stack, sptr, Remopla.mopedize(field.getName()));
 		if (field.categoryTwo())
 			Utils.append(b, ", %s[%s + 1] = 0", stack, sptr);
-		Utils.append(b, ", %s = %s + %d;", sptr, sptr, field.category.intValue());
+		Utils.append(b, ", %s = %s + %d;%n", 
+				sptr, sptr, field.getCategory().intValue());
+		Utils.append(b, "fi;");
 		return b.toString();
 	}
 	
@@ -742,10 +759,15 @@ public class Module {
 	}
 	
 	private static String globalstore(ExprSemiring d) {
-		ExprSemiring.Field field = (ExprSemiring.Field) d.value;
-		return String.format("%s = %s[%s - %d], %s = %s - %d;", 
-				Remopla.mopedize(field.name), stack, sptr, field.category.intValue(), 
-				sptr, sptr, field.category.intValue());
+		Field field = (Field) d.value;
+		StringBuilder b = new StringBuilder();
+		Utils.append(b, "if%n");
+		Utils.append(b, "\t:: (%s) -> ", fulfillsCondition((Condition) d.aux, 0));
+		Utils.append(b, "%s = %s[%s - %d], %s = %s - %d;%n", 
+				Remopla.mopedize(field.getName()), stack, sptr, field.getCategory().intValue(), 
+				sptr, sptr, field.getCategory().intValue());
+		Utils.append(b, "fi;");
+		return b.toString();
 	}
 	
 	private static String heapload() {
@@ -753,27 +775,26 @@ public class Module {
 				stack, sptr, heap, stack, sptr, sptr, sptr);
 	}
 	
-	private static String iftype(ExprSemiring.If.Type type) {
-		switch (type) {
-		case EQ: return "==";
-		case NE: return "!=";
-		case LT: return "<";
-		case GE: return ">=";
-		case GT: return ">";
-		case LE: return "<=";
-		default:
-			throw new RemoplaError("Unexpected if type");
-	}
-	}
+//	private static String iftype(int type) {
+//		switch (type) {
+//		case EQ: return "==";
+//		case NE: return "!=";
+//		case LT: return "<";
+//		case GE: return ">=";
+//		case GT: return ">";
+//		case LE: return "<=";
+//		default:
+//			throw new RemoplaError("Unexpected if type");
+//	}
+//	}
 	
-	private static String ifexpr(ExprSemiring.If expr) {
+	private static String ifexpr(If expr) {
 		
-		ExprSemiring.If.Type type = expr.type;
-		switch (type) {
-		case IS: return String.format("%s == %d", s0(), expr.getValue());
-		case LG: return String.format("%s < %d || %s > %d", 
+		switch (expr.getType()) {
+		case If.IS: return String.format("%s == %d", s0(), expr.getValue());
+		case If.LG: return String.format("%s < %d || %s > %d", 
 				s0(), expr.getLowValue(), s0(), expr.getHighValue());
-		case NOT: {
+		case If.NOT: {
 			StringBuilder b = new StringBuilder();
 			Set<Integer> not = expr.getNotSet();
 			int count = 0;
@@ -785,7 +806,7 @@ public class Module {
 			return b.toString();
 		}
 		default:
-			return String.format("%s %s 0", s0(), iftype(type));
+			return String.format("%s %s 0", s0(), Comp.toString(expr.getType()));
 		}
 	}
 	
@@ -797,7 +818,7 @@ public class Module {
 		do {
 			Utils.append(b, "\t:: (");
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
-			b.append(ifexpr((ExprSemiring.If) d.value));
+			b.append(ifexpr((If) d.value));
 			Utils.append(b, ") -> goto %s, %s = %s - 1;%n", Remopla.mopedize(rule.getRightLabel()), sptr, sptr);
 
 			// Next rule
@@ -816,7 +837,7 @@ public class Module {
 		do {
 			Utils.append(b, "\t:: (");
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
-			Utils.append(b, "%s %s %s", s1(), ((ExprSemiring.CompType) d.value).getName(), s0());
+			Utils.append(b, "%s %s %s", s1(), Comp.toString((Integer) d.value), s0());
 			Utils.append(b, ") -> goto %s, %s = %s - 2;%n", Remopla.mopedize(rule.getRightLabel()), sptr, sptr);
 			
 			// Next rule
@@ -828,7 +849,7 @@ public class Module {
 	}
 	
 	private static String inc(ExprSemiring d) {
-		ExprSemiring.Inc inc = (ExprSemiring.Inc) d.value;
+		Inc inc = (Inc) d.value;
 		if (inc.value > 0)
 			return String.format("%s = %s + %d;", lv(inc.index), lv(inc.index), inc.value);
 		else
@@ -843,7 +864,7 @@ public class Module {
 		Utils.append(b, "if%n");
 		do {
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
-			ExprSemiring.Invoke invoke = (ExprSemiring.Invoke) d.value;
+			Invoke invoke = (Invoke) d.value;
 			int nargs = invoke.nargs;
 			
 			// NPE
@@ -880,8 +901,8 @@ public class Module {
 		if (rule != null) {
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
 			if (d.type == ExprType.GLOBALLOAD || d.type == ExprType.GLOBALSTORE) {
-				ExprSemiring.Field f = (ExprSemiring.Field) d.value;
-				if (!f.name.equals(Remopla.e)) {
+				Field f = (Field) d.value;
+				if (!f.getName().equals(Remopla.e)) {
 					Utils.append(b, "\t\t%s%n", 
 							(d.type == ExprType.GLOBALLOAD) ? globalload(d) : globalstore(d));
 					
@@ -904,7 +925,7 @@ public class Module {
 	}
 	
 	private static String load(ExprSemiring d) {
-		ExprSemiring.Local local = (ExprSemiring.Local) d.value;
+		Local local = (Local) d.value;
 		if (local.category.one())
 			return String.format("%s[%s] = %s, %s = %s + 1;", 
 					stack, sptr, lv(local.index), sptr, sptr);
@@ -916,8 +937,8 @@ public class Module {
 	}
 	
 	private static String monitorenter(ExprSemiring d) {
-		ExprSemiring.Monitorenter expr = (ExprSemiring.Monitorenter) d.value;
-		if (expr.type == ExprSemiring.Monitorenter.Type.POP)
+		Monitorenter expr = (Monitorenter) d.value;
+		if (expr.type == Monitorenter.Type.POP)
 			return String.format("%s = %s - 1;", sptr, sptr);
 		return "skip;";
 	}
@@ -934,7 +955,7 @@ public class Module {
 		String label = rule.getLabel();
 		do {
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
-			ExprSemiring.New n = (ExprSemiring.New) d.value;
+			New n = (New) d.value;
 			
 			// Checks whether heap is enough
 			if (!nehprinted) {
@@ -962,7 +983,7 @@ public class Module {
 	}
 	
 	private static String newarray(ExprSemiring d, int heapsize) {
-		ExprSemiring.Newarray newarray = (ExprSemiring.Newarray) d.value;
+		Newarray newarray = (Newarray) d.value;
 		if (newarray.dim > 1)
 			throw new RemoplaError("Multi-dimensional arrays not supported");
 		
@@ -976,7 +997,7 @@ public class Module {
 				hptr, s0(), heapsize, heap, hptr, newarray.types[0], heap, hptr, s0(), hptr, hptr, s0(), s0(), hptr, ret);
 		Utils.append(b, "fi;%n");
 		
-		ExprSemiring.Value value = newarray.init;
+		Value value = newarray.init;
 		Utils.append(b, "do%n");
 		Utils.append(b, "\t:: (%s < %s) -> ", ret, arraylength(s0()), heap, s0());
 		if (value.all()) {
@@ -1020,11 +1041,11 @@ public class Module {
 //				throwExpr(b, (ExprSemiring.Return) expr.value);
 //				continue;
 //			} else {	// expr.type == ExprType.ONE
-				JumpType type = (JumpType) expr.value;
+				Jump type = (Jump) expr.value;
 				Condition c = (Condition) expr.aux;
 				boolean contains = (c == null) 
 					? false 
-					: (c.type == Condition.ConditionType.CONTAINS);
+					: (c.getType() == Condition.CONTAINS);
 				if (contains && !npeprinted) {
 					npe(s0());
 					npeprinted = true;
@@ -1038,7 +1059,7 @@ public class Module {
 					b.append(')');
 				Utils.append(b, ") -> goto %s",
 						Remopla.mopedize(rule.getRightLabel()));
-				if (expr.type == ExprType.JUMP && ((JumpType) expr.value) == JumpType.THROW) {
+				if (expr.type == ExprType.JUMP && ((Jump) expr.value) == Jump.THROW) {
 					Utils.append(b, ", %s[0] = %s[%s - 1], %s = 1, %s = 0", 
 							stack, stack, sptr, sptr, Remopla.e);
 				}
@@ -1054,7 +1075,7 @@ public class Module {
 	}
 	
 	private static String poppush(ExprSemiring d) {
-		ExprSemiring.Poppush poppush = (ExprSemiring.Poppush) d.value;
+		Poppush poppush = (Poppush) d.value;
 		int pop = poppush.pop;
 		int push = poppush.push;
 		
@@ -1096,7 +1117,7 @@ public class Module {
 	}
 	
 	private static String push(ExprSemiring d) {
-		ExprSemiring.Value value = (ExprSemiring.Value) d.value;
+		Value value = (Value) d.value;
 		String topush = null;
 		if (value.all() || value.isString() || value.isReal()) {
 			topush = "undef"; 
@@ -1113,26 +1134,29 @@ public class Module {
 		String cat2 = "";
 		
 		// Total nondeterministic or deterministic
+		int cat = value.getCategory().intValue();
 		if (topush != null) {
-			if (value.category.two())
+			if (cat == 2)
 				cat2 = String.format(", %s[%s + 1] = 0", stack, sptr);
-			return String.format("%s[%s] = %s%s, %s = %s + %d;",
-					stack, sptr, topush, cat2, sptr, sptr, value.category.intValue());
+			return String.format("if%n\t:: (%s) -> %s[%s] = %s%s, %s = %s + %d;%nfi;",
+					fulfillsCondition((Condition) d.aux, 0), stack, sptr, topush, 
+					cat2, sptr, sptr, cat);
 		}
 		
 		// Value range
-		if (value.category.two())
+		if (cat == 2)
 			cat2 = String.format(" && %s'[%s + 1] == 0", stack, sptr);
-		return String.format("skip (%s'[%s] >= %d && %s'[%s] <= %d%s && %s' == %s + %d);",
+		return String.format("skip (%s && %s'[%s] >= %d && %s'[%s] <= %d%s && %s' == %s + %d);",
+				fulfillsCondition((Condition) d.aux, 0),
 				stack, sptr, value.intValue(), 
 				stack, sptr, value.to.intValue(), 
 				cat2,  
-				sptr, sptr, value.category.intValue());
+				sptr, sptr, cat);
 	}
 	
 	private static String returnexpr(ExprSemiring d) {
-		ExprSemiring.Return r = (ExprSemiring.Return) d.value;
-		if (r.type == ExprSemiring.Return.Type.VOID)
+		Return r = (Return) d.value;
+		if (r.type == Return.Type.VOID)
 			return "return;";
 		else // if (r.type == ExprSemiring.Return.Type.SOMETHING)
 			return String.format("%s = %s[%s - %d]; return;", 
@@ -1144,7 +1168,7 @@ public class Module {
 	}
 	
 	private static String store(ExprSemiring d) {
-		ExprSemiring.Local local = (ExprSemiring.Local) d.value;
+		Local local = (Local) d.value;
 		if (local.category.one())
 			return String.format("%s = %s, %s = %s - 1;", 
 					lv(local.index), s0(), sptr, sptr);
@@ -1156,7 +1180,7 @@ public class Module {
 	}
 	
 	private static String unaryop(ExprSemiring d) {
-		ExprSemiring.Unaryop unaryop = (ExprSemiring.Unaryop) d.value;
+		Unaryop unaryop = (Unaryop) d.value;
 		String v = (unaryop.type.pop.one()) ? s0() : s1();
 		StringBuilder b = new StringBuilder();
 		switch (unaryop.type) {

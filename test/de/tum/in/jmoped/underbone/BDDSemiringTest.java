@@ -6,8 +6,8 @@ import static de.tum.in.jmoped.underbone.ExprType.NEWARRAY;
 import static de.tum.in.jmoped.underbone.ExprType.PUSH;
 import static de.tum.in.jmoped.underbone.ExprType.SWAP;
 import static de.tum.in.jmoped.underbone.ExprType.UNARYOP;
-import static de.tum.in.jmoped.underbone.ExprSemiring.Newarray;
-import static de.tum.in.jmoped.underbone.ExprSemiring.Value;
+import static de.tum.in.jmoped.underbone.expr.Newarray;
+import static de.tum.in.jmoped.underbone.expr.Value;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -22,6 +22,8 @@ import net.sf.javabdd.BDD.BDDIterator;
 import org.junit.Assert;
 import org.junit.Test;
 
+import de.tum.in.jmoped.underbone.expr.Newarray;
+import de.tum.in.jmoped.underbone.expr.Value;
 import de.tum.in.wpds.CancelMonitor;
 import de.tum.in.wpds.DefaultMonitor;
 import de.tum.in.wpds.Sat;

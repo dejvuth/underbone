@@ -12,13 +12,26 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.logging.Logger;
 
-import de.tum.in.jmoped.underbone.ExprSemiring.ArithType;
-import de.tum.in.jmoped.underbone.ExprSemiring.CategoryType;
-import de.tum.in.jmoped.underbone.ExprSemiring.Condition;
-import de.tum.in.jmoped.underbone.ExprSemiring.DupType;
-import de.tum.in.jmoped.underbone.ExprSemiring.JumpType;
-import de.tum.in.jmoped.underbone.ExprSemiring.Return;
-import de.tum.in.jmoped.underbone.ExprSemiring.Condition.ConditionType;
+import de.tum.in.jmoped.underbone.expr.Arith;
+import de.tum.in.jmoped.underbone.expr.Category;
+import de.tum.in.jmoped.underbone.expr.Comp;
+import de.tum.in.jmoped.underbone.expr.Condition;
+import de.tum.in.jmoped.underbone.expr.Dup;
+import de.tum.in.jmoped.underbone.expr.Field;
+import de.tum.in.jmoped.underbone.expr.If;
+import de.tum.in.jmoped.underbone.expr.Inc;
+import de.tum.in.jmoped.underbone.expr.Invoke;
+import de.tum.in.jmoped.underbone.expr.Jump;
+import de.tum.in.jmoped.underbone.expr.Local;
+import de.tum.in.jmoped.underbone.expr.Monitorenter;
+import de.tum.in.jmoped.underbone.expr.New;
+import de.tum.in.jmoped.underbone.expr.Newarray;
+import de.tum.in.jmoped.underbone.expr.Npe;
+import de.tum.in.jmoped.underbone.expr.Poppush;
+import de.tum.in.jmoped.underbone.expr.Print;
+import de.tum.in.jmoped.underbone.expr.Return;
+import de.tum.in.jmoped.underbone.expr.Unaryop;
+import de.tum.in.jmoped.underbone.expr.Value;
 import de.tum.in.wpds.Config;
 import de.tum.in.wpds.Fa;
 import de.tum.in.wpds.Pds;
@@ -202,57 +215,59 @@ public class VirtualMachine {
 				ExprSemiring d = (ExprSemiring) rule.d;
 				switch (d.type) {
 				
-				case ARITH: {
-					boolean two = ((CategoryType) d.aux).two();
+				case ExprType.ARITH: {
+					Arith arith = (Arith) d.value;
+					boolean two = arith.getCategory() == Category.TWO;
 					Number s0 = frame.pop();
 					if (two) s0 = frame.pop();
 					Number s1 = frame.pop();
 					if (two) s1 = frame.pop();
-					ArithType type = (ArithType) d.value;
+					
+					int type = arith.getType();
 					switch (type) {
-						case ADD: s0 = s1.longValue() + s0.longValue(); break;
-						case AND: s0 = s1.longValue() & s0.longValue(); break;
-						case CMP:
+						case Arith.ADD: s0 = s1.longValue() + s0.longValue(); break;
+						case Arith.AND: s0 = s1.longValue() & s0.longValue(); break;
+						case Arith.CMP:
 							if (s1.longValue() > s0.longValue()) s0 = 1;
 							else if (s1.longValue() == s0.longValue()) s0 = 0;
 							else s0 = -1;
 							break;
-						case DIV: s0 = s1.longValue() / s0.longValue(); break;
-						case MUL: s0 = s1.longValue() * s0.longValue(); break;
-						case OR: s0 = s1.longValue() | s0.longValue(); break;
-						case REM: s0 = s1.longValue() % s0.longValue(); break;
-						case SHL: s0 = s1.longValue() << (s0.intValue() & 31); break;
-						case SHR: s0 = s1.longValue() >> (s0.intValue() & 31); break;
-						case SUB: s0 = s1.longValue() - s0.longValue(); break;
-						case USHR: s0 = s1.longValue() >>> (s0.intValue() & 31); break;
-						case XOR: s0 = s1.longValue() ^ s0.longValue(); break;
-						case FADD: s0 = s1.doubleValue() + s0.doubleValue(); break;
-						case FCMPG: 
-						case FCMPL: {
+						case Arith.DIV: s0 = s1.longValue() / s0.longValue(); break;
+						case Arith.MUL: s0 = s1.longValue() * s0.longValue(); break;
+						case Arith.OR: s0 = s1.longValue() | s0.longValue(); break;
+						case Arith.REM: s0 = s1.longValue() % s0.longValue(); break;
+						case Arith.SHL: s0 = s1.longValue() << (s0.intValue() & 31); break;
+						case Arith.SHR: s0 = s1.longValue() >> (s0.intValue() & 31); break;
+						case Arith.SUB: s0 = s1.longValue() - s0.longValue(); break;
+						case Arith.USHR: s0 = s1.longValue() >>> (s0.intValue() & 31); break;
+						case Arith.XOR: s0 = s1.longValue() ^ s0.longValue(); break;
+						case Arith.FADD: s0 = s1.doubleValue() + s0.doubleValue(); break;
+						case Arith.FCMPG: 
+						case Arith.FCMPL: {
 							if (s1.doubleValue() > s0.doubleValue()) s0 = 1f;
 							else if (s1.doubleValue() == s0.doubleValue()) s0 = 0f;
 							else if (s1.doubleValue() < s0.doubleValue()) s0 = -1f;
 							// At least one must be NaN
-							else if (type == ArithType.FCMPG) s0 = 1f;
+							else if (type == Arith.FCMPG) s0 = 1f;
 							else s0 = -1f;
 							break;
 						}
-						case FDIV: s0 = s1.doubleValue() / s0.doubleValue(); break;
-						case FMUL: s0 = s1.doubleValue() * s0.doubleValue(); break;
-						case FREM: s0 = s1.doubleValue() % s0.doubleValue(); break;
-						case FSUB: s0 = s1.doubleValue() - s0.doubleValue(); break;
-						case NDT: {
+						case Arith.FDIV: s0 = s1.doubleValue() / s0.doubleValue(); break;
+						case Arith.FMUL: s0 = s1.doubleValue() * s0.doubleValue(); break;
+						case Arith.FREM: s0 = s1.doubleValue() % s0.doubleValue(); break;
+						case Arith.FSUB: s0 = s1.doubleValue() - s0.doubleValue(); break;
+						case Arith.NDT: {
 							double p = s0.doubleValue() - s1.doubleValue() + 1.0;
 							s0 = ((long) (p * Math.random())) + s1.longValue();
 							break;
 						}
 					}
 					frame.stack.push(s0);
-					if (two && type != ArithType.CMP) frame.stack.push(0);
+					if (two && type != Arith.CMP) frame.stack.push(0);
 					break;
 				}
 				
-				case ARRAYLENGTH: {
+				case ExprType.ARRAYLENGTH: {
 					// Checks NPE
 					int s0 = frame.pop().intValue();
 					if (npe(s0, rule.left.w[0], listener, raw, frames)) break;
@@ -262,7 +277,7 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case ARRAYLOAD: {
+				case ExprType.ARRAYLOAD: {
 					// Checks NPE
 					int s0 = frame.pop().intValue();	// index
 					int s1 = frame.pop().intValue();	// arrayref
@@ -279,14 +294,14 @@ public class VirtualMachine {
 					frame.stack.push(heap.get(indexOfArrayElement(s1, s0)));
 					
 					// Category 2
-					if (((ExprSemiring.CategoryType) d.value).two())
+					if (((Category) d.value).two())
 						frame.stack.push(0);
 					break;
 				}
 				
-				case ARRAYSTORE: {
+				case ExprType.ARRAYSTORE: {
 					// Category 2
-					if (((ExprSemiring.CategoryType) d.value).two())
+					if (((Category) d.value).two())
 						frame.pop();
 					
 					// Checks NPE
@@ -306,7 +321,7 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case CONSTLOAD: {
+				case ExprType.CONSTLOAD: {
 					// Checks whether the condition is fulfilled
 					if (!fulfillsCondition(d)) {
 						thisrule = false;
@@ -314,14 +329,14 @@ public class VirtualMachine {
 					}
 					
 					// Pushes constant
-					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
-					frame.push(constants.get(field.name));
+					Field field = (Field) d.value;
+					frame.push(constants.get(field.getName()));
 					if (field.categoryTwo())
 						frame.push(0);
 					break;
 				}
 				
-				case CONSTSTORE: {
+				case ExprType.CONSTSTORE: {
 					// Checks whether the condition is fulfilled
 					if (!fulfillsCondition(d)) {
 						thisrule = false;
@@ -329,16 +344,16 @@ public class VirtualMachine {
 					}
 					
 					// Pops and stores constant
-					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+					Field field = (Field) d.value;
 					if (field.categoryTwo())
 						frame.pop();
-					constants.put(field.name, frame.pop());
+					constants.put(field.getName(), frame.pop());
 					break;
 				}
 				
-				case DUP: {
+				case ExprType.DUP: {
 					// Pops
-					DupType type = (DupType) d.value;
+					Dup type = (Dup) d.value;
 					Number[] values = new Number[type.down];
 					for (int i = 0; i < type.down; i++)
 						values[i] = frame.stack.pop();
@@ -353,12 +368,12 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case ERROR: {
+				case ExprType.ERROR: {
 					error(rule.left.w[0], raw, frames);
 					break;
 				}
 				
-				case FIELDLOAD: {
+				case ExprType.FIELDLOAD: {
 					// Checks condition
 					if (!fulfillsCondition(d)) {
 						thisrule = false;
@@ -370,14 +385,14 @@ public class VirtualMachine {
 					if (npe(s0, rule.left.w[0], listener, raw, frames)) break;
 					
 					// Pushes
-					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
-					frame.stack.push(heap.get(s0 + field.id));
+					Field field = (Field) d.value;
+					frame.stack.push(heap.get(s0 + field.getId()));
 					if (field.categoryTwo())
 						frame.stack.push(0);
 					break;
 				}
 				
-				case FIELDSTORE: {
+				case ExprType.FIELDSTORE: {
 					// Checks condition
 					if (!fulfillsCondition(d)) {
 						thisrule = false;
@@ -385,7 +400,7 @@ public class VirtualMachine {
 					}
 					
 					// Checkes NPE
-					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+					Field field = (Field) d.value;
 					Number s0 = frame.pop();
 					if (field.categoryTwo())
 						s0 = frame.pop();
@@ -394,100 +409,100 @@ public class VirtualMachine {
 					if (npe(s1, rule.left.w[0], listener, raw, frames)) break;
 					
 					// Stores s0 to heap
-					heap.set(s1 + field.id, s0);
+					heap.set(s1 + field.getId(), s0);
 					break;
 				}
 				
-				case GETRETURN: {
+				case ExprType.GETRETURN: {
 					frame.stack.push(retvar);
-					if (((ExprSemiring.CategoryType) d.value).two())
+					if (((Category) d.value).two())
 						frame.stack.push(0);
 					break;
 				}
 				
 				// Pushes from global
-				case GLOBALLOAD: {
+				case ExprType.GLOBALLOAD: {
 					// Checks whether the invoke condition is fulfilled
 					if (!fulfillsCondition(d)) {
 						thisrule = false;
 						break;
 					}
 					
-					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
-					frame.stack.push(globals.get(field.name));
+					Field field = (Field) d.value;
+					frame.stack.push(globals.get(field.getName()));
 					if (field.categoryTwo())
 						frame.stack.push(0);
 					break;
 				}
 				
 				// Constant to global
-				case GLOBALPUSH: {
+				case ExprType.GLOBALPUSH: {
 					globals.put((String) d.value, (Integer) d.aux);
 					break;
 				}
 				
 				// Pops to global
-				case GLOBALSTORE: {
+				case ExprType.GLOBALSTORE: {
 					// Checks whether the invoke condition is fulfilled
 					if (!fulfillsCondition(d)) {
 						thisrule = false;
 						break;
 					}
 					
-					ExprSemiring.Field field = (ExprSemiring.Field) d.value;
+					Field field = (Field) d.value;
 					Number value = frame.pop();
 					if (field.categoryTwo()) value = frame.pop();
-					globals.put(field.name, value);
+					globals.put(field.getName(), value);
 					break;
 				}
 				
-				case HEAPLOAD: {
+				case ExprType.HEAPLOAD: {
 					frame.stack.push(heap.get(frame.stack.pop().intValue()));
 					break;
 				}
 				
-				case HEAPOVERFLOW: {
+				case ExprType.HEAPOVERFLOW: {
 					// Always has enough heap
 					thisrule = false;
 					break;
 				}
 				
-				case HEAPRESTORE: {
+				case ExprType.HEAPRESTORE: {
 					heap = heapsave;
 					globals = globalssave;
 					break;
 				}
 				
-				case HEAPRESET: {
+				case ExprType.HEAPRESET: {
 					heap.clear();
 					heap.add(0);
 					break;
 				}
 				
-				case HEAPSAVE: {
+				case ExprType.HEAPSAVE: {
 					heapsave = new Heap((int) (1.4*heap.size()));
 					heapsave.addAll(heap);
 					globalssave = new HashMap<String, Number>(globals);
 					break;
 				}
 				
-				case IF: {
+				case ExprType.IF: {
 					Number s0 = frame.pop();
 					int i = s0.intValue();
-					ExprSemiring.If expr = (ExprSemiring.If) d.value;
-					switch (expr.type) {
-						case EQ: if (i != 0) thisrule = false; break;
-						case NE: if (i == 0) thisrule = false; break;
-						case LT: if (i >= 0) thisrule = false; break;
-						case GE: if (i < 0) thisrule = false; break;
-						case GT: if (i <= 0) thisrule = false; break;
-						case LE: if (i > 0) thisrule = false; break;
-						case IS: if (i != expr.getValue()) thisrule = false; break;
-						case LG: 
+					If expr = (If) d.value;
+					switch (expr.getType()) {
+						case If.EQ: if (i != 0) thisrule = false; break;
+						case If.NE: if (i == 0) thisrule = false; break;
+						case If.LT: if (i >= 0) thisrule = false; break;
+						case If.GE: if (i < 0) thisrule = false; break;
+						case If.GT: if (i <= 0) thisrule = false; break;
+						case If.LE: if (i > 0) thisrule = false; break;
+						case If.IS: if (i != expr.getValue()) thisrule = false; break;
+						case If.LG: 
 							if (i >= expr.getLowValue() && i <= expr.getHighValue()) 
 								thisrule = false; 
 							break;
-						case NOT:
+						case If.NOT:
 							if (expr.getNotSet().contains(i))
 								thisrule = false;
 							break;
@@ -499,18 +514,18 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case IFCMP: {
+				case ExprType.IFCMP: {
 					Number s0 = frame.pop();
 					Number s1 = frame.pop();
 					int i0 = s0.intValue();
 					int i1 = s1.intValue();
-					switch ((ExprSemiring.CompType) d.value) {
-						case EQ: if (i1 != i0) thisrule = false; break;
-						case NE: if (i1 == i0) thisrule = false; break;
-						case LT: if (i1 >= i0) thisrule = false; break;
-						case GE: if (i1 < i0) thisrule = false; break;
-						case GT: if (i1 <= i0) thisrule = false; break;
-						case LE: if (i1 > i0) thisrule = false; break;
+					switch ((Integer) d.value) {
+						case Comp.EQ: if (i1 != i0) thisrule = false; break;
+						case Comp.NE: if (i1 == i0) thisrule = false; break;
+						case Comp.LT: if (i1 >= i0) thisrule = false; break;
+						case Comp.GE: if (i1 < i0) thisrule = false; break;
+						case Comp.GT: if (i1 <= i0) thisrule = false; break;
+						case Comp.LE: if (i1 > i0) thisrule = false; break;
 					}
 					if (!thisrule) {
 						frame.stack.push(s1);
@@ -520,15 +535,15 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case INC: {
-					ExprSemiring.Inc inc = (ExprSemiring.Inc) d.value;
+				case ExprType.INC: {
+					Inc inc = (Inc) d.value;
 					frame.lv[inc.index] = ((Number) frame.lv[inc.index]).intValue() + inc.value;
 					break;
 				}
 				
-				case INVOKE: {
+				case ExprType.INVOKE: {
 					// Checks NPE
-					ExprSemiring.Invoke invoke = (ExprSemiring.Invoke) d.value;
+					Invoke invoke = (Invoke) d.value;
 					int nargs = invoke.nargs;
 					if (!invoke.isStatic) {
 						if (npe(frame.get(frame.stack.size() - nargs).intValue(), 
@@ -601,8 +616,8 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case IOOB: {
-					ExprSemiring.Npe npe = (ExprSemiring.Npe) d.value;
+				case ExprType.IOOB: {
+					Npe npe = (Npe) d.value;
 					int ptr = frame.get(frame.stack.size() - npe.depth - 1).intValue();
 					int index = frame.get(frame.stack.size() - npe.depth).intValue();
 					log("\t\tptr: %d, index: %d%n", ptr, index);
@@ -614,15 +629,15 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case JUMP: {
+				case ExprType.JUMP: {
 					// Checks whether the invoke condition is fulfilled
 					if (!fulfillsCondition(d)) {
 						thisrule = false;
 						break;
 					}
 					
-					JumpType type = (JumpType) d.value;
-					if (type.equals(JumpType.ONE))
+					Jump type = (Jump) d.value;
+					if (type.equals(Jump.ONE))
 						break;
 					
 					// JumpType.THROW
@@ -633,32 +648,32 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case LOAD: {
-					ExprSemiring.Local local = (ExprSemiring.Local) d.value;
+				case ExprType.LOAD: {
+					Local local = (Local) d.value;
 					frame.stack.push(frame.lv[local.index]);
 					if (local.category.two())
 						frame.stack.push(0);
 					break;
 				}
 				
-				case MONITORENTER: {
-					ExprSemiring.Monitorenter expr = (ExprSemiring.Monitorenter) d.value;
-					if (expr.type == ExprSemiring.Monitorenter.Type.POP)
+				case ExprType.MONITORENTER: {
+					Monitorenter expr = (Monitorenter) d.value;
+					if (expr.type == Monitorenter.Type.POP)
 						frame.pop();
 					break;
 				}
 				
-				case MONITOREXIT: {
+				case ExprType.MONITOREXIT: {
 					frame.pop();
 					break;
 				}
 				
-				case NEW: {
+				case ExprType.NEW: {
 					if (!fulfillsCondition(d)) {
 						thisrule = false;
 						break;
 					}
-					ExprSemiring.New n = (ExprSemiring.New) d.value;
+					New n = (New) d.value;
 					int index = heap.size();
 					heap.add(n.id);
 					for (int i = 0; i < n.size; i++)
@@ -667,9 +682,9 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case NEWARRAY: {
+				case ExprType.NEWARRAY: {
 					// Pops the dimensions
-					ExprSemiring.Newarray newarray = (ExprSemiring.Newarray) d.value;
+					Newarray newarray = (Newarray) d.value;
 					int[] s = new int[newarray.dim];
 					for (int i = 0; i < newarray.dim; i++) {
 						s[i] = frame.pop().intValue();
@@ -724,8 +739,8 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case NPE: {
-					ExprSemiring.Npe npe = (ExprSemiring.Npe) d.value;
+				case ExprType.NPE: {
+					Npe npe = (Npe) d.value;
 					Object o = frame.get(frame.stack.size() - npe.depth - 1);
 					if (!(o instanceof Number)) break;
 					if (((Number) o).intValue() != 0) {
@@ -735,8 +750,8 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case POPPUSH: {
-					ExprSemiring.Poppush poppush = (ExprSemiring.Poppush) d.value;
+				case ExprType.POPPUSH: {
+					Poppush poppush = (Poppush) d.value;
 					for (int i = 0; i < poppush.pop; i++)
 						frame.pop();
 					for (int i = 0; i < poppush.push; i++)
@@ -744,22 +759,26 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case PRINT: {
+				case ExprType.PRINT: {
 					Number s0 = frame.pop();
-					ExprSemiring.Print print = (ExprSemiring.Print) d.value;
+					Print print = (Print) d.value;
 					switch (print.type) {
-					case INTEGER: System.out.print(s0.longValue()); break;
-					case FLOAT: System.out.print(s0.doubleValue()); break;
-					case CHARACTER: System.out.print((char) s0.intValue()); break;
-					case STRING: System.out.print(strings.get(s0.intValue())); break;
+					case Print.INTEGER: System.out.print(s0.longValue()); break;
+					case Print.FLOAT: System.out.print(s0.doubleValue()); break;
+					case Print.CHARACTER: System.out.print((char) s0.intValue()); break;
+					case Print.STRING: System.out.print(strings.get(s0.intValue())); break;
 					}
 					if (print.newline)
 						System.out.println();
 					break;
 				}
 				
-				case PUSH: {
-					ExprSemiring.Value value = (ExprSemiring.Value) d.value;
+				case ExprType.PUSH: {
+					if (!fulfillsCondition(d)) {
+						thisrule = false;
+						break;
+					}
+					Value value = (Value) d.value;
 					if (value.all()) frame.stack.push(0);
 					else if (value.isString()) 
 						frame.push(encode(value.stringValue()));
@@ -774,12 +793,12 @@ public class VirtualMachine {
 						frame.push(Math.random());
 					}
 					
-					if (value.category.two())
+					if (value.getCategory().two())
 						frame.stack.push(0);
 					break;
 				}
 				
-				case RETURN: {
+				case ExprType.RETURN: {
 					Return ret = (Return) d.value;
 					if (ret.type == Return.Type.SOMETHING) {
 						retvar = frame.stack.pop();
@@ -799,8 +818,8 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case STORE: {
-					ExprSemiring.Local local = (ExprSemiring.Local) d.value;
+				case ExprType.STORE: {
+					Local local = (Local) d.value;
 					if (local.category.one()) {
 						frame.lv[local.index] = frame.pop();
 					}
@@ -811,7 +830,7 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case SWAP: {
+				case ExprType.SWAP: {
 					Number s0 = frame.stack.pop();
 					Number s1 = frame.stack.pop();
 					frame.stack.push(s0);
@@ -819,8 +838,8 @@ public class VirtualMachine {
 					break;
 				}
 				
-				case UNARYOP: {
-					ExprSemiring.Unaryop unaryop = (ExprSemiring.Unaryop) d.value;
+				case ExprType.UNARYOP: {
+					Unaryop unaryop = (Unaryop) d.value;
 					Number v = frame.pop();
 					if (unaryop.type.pop.two())
 						v = frame.pop();
@@ -958,23 +977,24 @@ public class VirtualMachine {
 		if (A.aux == null) return true;
 		
 		Condition cond = (Condition) A.aux;
-		if (cond.type == ConditionType.CONTAINS || cond.type == ConditionType.NOTCONTAINS) {
+		int type = cond.getType();
+		if (type == Condition.CONTAINS || type == Condition.NOTCONTAINS) {
 			
-			Set<Integer> set = (Set<Integer>) cond.value;
+			Set<Integer> set = cond.getSetValue();
 			int ptr = ((Number) frame.stack.elementAt(frame.stack.size() - s)).intValue();
 			int id = heap.get(ptr).intValue();
-			if (cond.type == ConditionType.CONTAINS)
+			if (type == Condition.CONTAINS)
 				return set.contains(id);
 			else
 				return !set.contains(id);
 		}
 		
-		int g = ((Number) globals.get((String) cond.value)).intValue();
-		switch (cond.type) {
-		case ZERO:
+		int g = ((Number) globals.get(cond.getStringValue())).intValue();
+		switch (type) {
+		case Condition.ZERO:
 			if (g == 0) return true;
 			break;
-		case ONE:
+		case Condition.ONE:
 			if (g == 1) return true;
 			break;
 		}
@@ -986,15 +1006,15 @@ public class VirtualMachine {
 		
 		int id = 0;
 		switch (A.type) {
-		case INVOKE:
-			id = ((ExprSemiring.Invoke) A.value).nargs;
+		case ExprType.INVOKE:
+			id = ((Invoke) A.value).nargs;
 			break;
-		case FIELDLOAD:
-		case JUMP:
+		case ExprType.FIELDLOAD:
+		case ExprType.JUMP:
 			id = 1;
 			break;
-		case FIELDSTORE:
-			id = ((ExprSemiring.Field) A.value).categoryTwo() ? 3 : 2;
+		case ExprType.FIELDSTORE:
+			id = ((Field) A.value).categoryTwo() ? 3 : 2;
 			break;
 		}
 		
