@@ -12,7 +12,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 
-import de.tum.in.jmoped.underbone.ExprSemiring.ArithType;
+import de.tum.in.jmoped.underbone.expr.Arith;
+import de.tum.in.jmoped.underbone.expr.If;
 import de.tum.in.wpds.Utils;
 
 import net.sf.javabdd.BDD;
@@ -147,7 +148,7 @@ public class VarManager {
 		log("bits: %d, heapSizes: %s, g: %s, smax: %s, lvmax: %d, tbound %d%n",
 				bits, Arrays.toString(heapSizes), g, smax, lvmax, tbound);
 		this.bits = bits;
-		this.size = (long) Math.pow(2, bits);
+		this.size = 1 << bits;
 		this.maxint = (int) size/2 - 1;
 		this.heapSizes = heapSizes;
 		this.smax = smax;
@@ -163,9 +164,9 @@ public class VarManager {
 		}
 		
 		// Prepares array for domains
-		int heapLength = heapSizes.length;
 		int s = smax + varcopy*lvmax;
 		if (smax > 0) s++;	// for stack pointer
+		int heapLength = (heapSizes == null) ? 0 : heapSizes.length;
 		if (heapLength > 1) s += globalcopy*(heapLength + 1);
 		if (g != null && !g.isEmpty()) {
 			s += globalcopy*g.size();
@@ -281,6 +282,7 @@ public class VarManager {
 	}
 	
 	public int getHeapSize() {
+		if (heapSizes == null) return 0;
 		return heapSizes.length;
 	}
 	
@@ -828,8 +830,13 @@ public class VarManager {
 		return doms[sDomIndex + index];
 	}
 	
+	/**
+	 * Gets the <code>BDDDomain</code> of the local variable at <code>index</code>.
+	 * 
+	 * @param index the stack element index.
+	 * @return the <code>BDDDomain</code> of the local variable.
+	 */
 	public BDDDomain getLocalVarDomain(int index) {
-		
 		if (lvDomIndex == -1) return null;
 		return doms[lvDomIndex + varcopy*index];
 	}
@@ -841,35 +848,35 @@ public class VarManager {
 	 * @param sdom
 	 * @return
 	 */
-	BDD ifBDD(ExprSemiring.If expr, BDDDomain sdom) {
+	BDD ifBDD(If expr, BDDDomain sdom) {
 		
 		int bits = getBits();
-		switch (expr.type) {
+		switch (expr.getType()) {
 		
-		case EQ:
+		case If.EQ:
 			return sdom.ithVar(0);
 				
-		case NE:
+		case If.NE:
 			return sdom.ithVar(0).not();
 			
-		case LT:
+		case If.LT:
 			return factory.ithVar(sdom.vars()[bits-1]);
 			
-		case GE:
+		case If.GE:
 			return factory.nithVar(sdom.vars()[bits-1]);
 			
-		case GT:
+		case If.GT:
 			return factory.nithVar(sdom.vars()[bits-1])
 					.andWith(sdom.ithVar(0).not());
 			
-		case LE:
+		case If.LE:
 			return factory.ithVar(sdom.vars()[bits-1])
 					.orWith(sdom.ithVar(0));
 			
-		case IS:
+		case If.IS:
 			return sdom.ithVar(expr.getValue());
 			
-		case LG: {
+		case If.LG: {
 			BDD a = factory.zero();
 			for (int i = expr.getLowValue(); i <= expr.getHighValue(); i++) {
 				a.orWith(sdom.ithVar(encode(i, sdom)));
@@ -879,7 +886,7 @@ public class VarManager {
 			return b;
 		}
 		
-		case NOT: {
+		case If.NOT: {
 			Set<Integer> set = expr.getNotSet();
 			BDD a = factory.zero();
 			for (int i : set) {
@@ -891,16 +898,16 @@ public class VarManager {
 		}
 		}
 		
-		throw new IllegalArgumentException("Invalid comparison type: " + expr.type);
+		throw new IllegalArgumentException("Invalid comparison type: " + expr.getType());
 	}
 	
 	/**
-	 * Returns the bdd representing the equality of two variables 
+	 * Returns the BDD representing the equality of two variables 
 	 * specified by dom1 and dom2.
 	 * 
-	 * @param dom1
-	 * @param dom2
-	 * @return
+	 * @param dom1 the BDD domain 1
+	 * @param dom2 the BDD domain 2
+	 * @return the equality BDD
 	 */
 	public BDD bddEquals(BDDDomain dom1, BDDDomain dom2) {
 		
@@ -962,26 +969,6 @@ public class VarManager {
 		
 		return G0L0equalsG1L1;
 	}
-	
-//	private BDD[] G0equalsGtid;
-//	
-//	public BDD buildG0equalsGtid(int tid) {
-//		
-//		if (G0equalsGtid == null)
-//			G0equalsGtid = new BDD[tbound];
-//		
-//		if (G0equalsGtid[tid - 1] != null)
-//			return G0equalsGtid[tid - 1];
-//		
-//		int offset = varcopy + tid - 1;
-//		BDD a = factory.one();
-//		for (int i = 0; i < gnum; i++) {
-//			int index = g0 + globalcopy*i;
-//			a.andWith(doms[index].buildEquals(doms[index + offset]));
-//		}
-//		G0equalsGtid[tid - 1] = a;
-//		return a;
-//	}
 	
 	private BDD G0equalsG3;
 	
@@ -1436,61 +1423,61 @@ public class VarManager {
 	 * @param dom2 the domain of value 2.
 	 * @return the arithmetic result.
 	 */
-	public BDD arith(ArithType type, BDDDomain rdom, 
+	public BDD arith(int type, BDDDomain rdom, 
 			long v1, BDDDomain dom1, long v2, BDDDomain dom2) {
 		
 		switch (type) {
-		case ADD:
+		case Arith.ADD:
 			return rdom.ithVar(encode(decode(v1, dom1) + decode(v2, dom2), rdom));
-		case AND:
+		case Arith.AND:
 			return rdom.ithVar(encode(decode(v1, dom1) & decode(v2, dom2), rdom));
-		case CMP: {
+		case Arith.CMP: {
 			int de1 = decode(v1, dom1);
 			int de2 = decode(v2, dom2);
 			if (de1 > de2) return rdom.ithVar(encode(1, rdom));
 			if (de1 == de2) return rdom.ithVar(encode(0, rdom));
 			return rdom.ithVar(encode(-1, rdom));
 		}
-		case DIV:
+		case Arith.DIV:
 			return rdom.ithVar(encode(decode(v1, dom1) / decode(v2, dom2), rdom));
-		case MUL:
+		case Arith.MUL:
 			return rdom.ithVar(encode(decode(v1, dom1) * decode(v2, dom2), rdom));
-		case OR:
+		case Arith.OR:
 			return rdom.ithVar(encode(decode(v1, dom1) | decode(v2, dom2), rdom));
-		case REM:
+		case Arith.REM:
 			return rdom.ithVar(encode(decode(v1, dom1) % decode(v2, dom2), rdom));
-		case SHL:
+		case Arith.SHL:
 			return rdom.ithVar(encode(decode(v1, dom1) << (decode(v2, dom2) & 31), rdom));
-		case SHR:
+		case Arith.SHR:
 			return rdom.ithVar(encode(decode(v1, dom1) >> (decode(v2, dom2) & 31), rdom));
-		case SUB:
+		case Arith.SUB:
 			return rdom.ithVar(encode(decode(v1, dom1) - decode(v2, dom2), rdom));
-		case USHR:
+		case Arith.USHR:
 			return rdom.ithVar(encode(decode(v1, dom1) >>> (decode(v2, dom2) & 31), rdom));
-		case XOR:
+		case Arith.XOR:
 			return rdom.ithVar(encode(decode(v1, dom1) ^ decode(v2, dom2), rdom));
-		case FADD:
+		case Arith.FADD:
 			return rdom.ithVar(encode(decodeFloat(v1) + decodeFloat(v2), rdom));
-		case FCMPG: 
-		case FCMPL: {
+		case Arith.FCMPG: 
+		case Arith.FCMPL: {
 			float f1 = decodeFloat(v1);
 			float f2 = decodeFloat(v2);
 			if (f1 > f2) return rdom.ithVar(encode(1, rdom));
 			else if (f1 == f2) return rdom.ithVar(encode(0, rdom));
 			else if (f1 < f2) return rdom.ithVar(encode(-1, rdom));
 			// At least one must be NaN
-			else if (type == ArithType.FCMPG) return rdom.ithVar(encode(1, rdom));
+			else if (type == Arith.FCMPG) return rdom.ithVar(encode(1, rdom));
 			else return rdom.ithVar(encode(-1, rdom));
 		}
-		case FDIV:
+		case Arith.FDIV:
 			return rdom.ithVar(encode(decodeFloat(v1) / decodeFloat(v2), rdom));
-		case FMUL:
+		case Arith.FMUL:
 			return rdom.ithVar(encode(decodeFloat(v1) * decodeFloat(v2), rdom));
-		case FREM:
+		case Arith.FREM:
 			return rdom.ithVar(encode(decodeFloat(v1) % decodeFloat(v2), rdom));
-		case FSUB:
+		case Arith.FSUB:
 			return rdom.ithVar(encode(decodeFloat(v1) - decodeFloat(v2), rdom));
-		case NDT:
+		case Arith.NDT:
 			return bddRange(rdom, decode(v1, dom1), decode(v2, dom2));
 			
 		default:
