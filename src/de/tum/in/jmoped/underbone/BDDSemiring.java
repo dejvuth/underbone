@@ -1,6 +1,7 @@
 package de.tum.in.jmoped.underbone;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -426,7 +427,12 @@ public class BDDSemiring implements Semiring {
 			
 			// Prunes the original bdd with s0 and copies the length values to temp
 			BDDDomain ldom = manager.getArrayLengthDomain(s0);
-			c.orWith(bdd.id().andWith(s0dom.ithVar(s0)).andWith(manager.bddEquals(ldom, tdom)));
+			BDD eq = manager.bddEquals(ldom, tdom);
+//			System.out.printf("ldom: %s%n", Arrays.toString(ldom.vars()));
+//			System.out.printf("tdom: %s%n", Arrays.toString(tdom.vars()));
+//			System.out.println(eq);
+			c.orWith(bdd.id().andWith(s0dom.ithVar(s0)).andWith(eq));
+//			System.out.println(c);
 		}
 		
 		// s0 gets the temp
@@ -1686,17 +1692,14 @@ public class BDDSemiring implements Semiring {
 								newarray.types[newarray.dim-i]);
 					e.andWith(manager.getHeapDomain(ptr++).ithVar(newarray.types[newarray.dim-i]));
 					log("\t\tptr: %d%n", ptr);
-					
 					// Updtes ptr wrt. owner & counter
 					for (int k = 2; k < manager.getArrayAuxSize(); k++)
 						e.andWith(manager.getHeapDomain(ptr++).ithVar(0));
-					
 					// Fills the array length
 					e.andWith(manager.getHeapDomain(ptr++).ithVar(blocksize));
 					
 					// Fills the array elements
 					for (int k = 0; k < blocksize; k++) {
-						
 						// Initializes the array values
 						BDDDomain hdom = manager.getHeapDomain(ptr++);
 						BDD value;
