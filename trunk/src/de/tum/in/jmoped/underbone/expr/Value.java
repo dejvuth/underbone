@@ -51,8 +51,13 @@ public class Value {
 		this.to = to;
 	}
 	
-	public Value(Category category, String value) {
-		this.category = category;
+	/**
+	 * Creates a value of type string.
+	 * 
+	 * @param value the value
+	 */
+	public Value(String value) {
+		this.category = Category.ONE;
 		this.value = value;
 	}
 	

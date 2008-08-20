@@ -44,4 +44,35 @@ public class Arith implements Expr {
 	public Category getCategory() {
 		return category;
 	}
+	
+	private static String toString(int type) {
+		switch(type) {
+		case ADD: return "ADD";
+		case AND: return "AND";
+		case CMP: return "CMP";
+		case DIV: return "DIV";
+		case MUL: return "MUL";
+		case OR: return "OR";
+		case REM: return "REM";
+		case SHL: return "SHL";
+		case SHR: return "SHR";
+		case SUB: return "SUB";
+		case USHR: return "USHR";
+		case XOR: return "XOR";
+		case FADD: return "FADD";
+		case FCMPG: return "FCMPG";
+		case FCMPL: return "FCMPL";
+		case FDIV: return "FDIV";
+		case FMUL: return "FMUL";
+		case FREM: return "FREM";
+		case FSUB: return "FSUB";
+		case NDT: return "NDT";
+		}
+		
+		throw new ExprError("Unexpected arithmetic type %d", type);
+	}
+	
+	public String toString() {
+		return String.format("%s %s", toString(type), category.toString());
+	}
 }

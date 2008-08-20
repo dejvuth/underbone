@@ -112,9 +112,12 @@ public class BDDSemiring implements Semiring {
 		for (int i = 0; i < vdoms.length; i++) {
 			if (vdoms[i] == null)	// Pushes dummy zero in case of null
 				c.andWith(sdoms[i+1].ithVar(0));
-			else
-				c.andWith(manager.bddEquals(sdoms[i + 1], vdoms[i]));
+			else {
+				BDD eq = manager.bddEquals(sdoms[i + 1], vdoms[i]);
+				c.andWith(eq);
+			}
 		}
+		
 		return c;
 	}
 	
@@ -1973,37 +1976,51 @@ public class BDDSemiring implements Semiring {
 		BDDDomain spdom = manager.getStackPointerDomain();
 		int sp = bdd.scanVar(spdom).intValue();
 		BDDDomain s0dom = manager.getStackDomain(sp - 1);
-		BDDIterator s0itr = manager.iterator(bdd, s0dom);
 		
+		BDD c;
 		Print print = (Print) A.value;
 		StringBuilder out = new StringBuilder();
-		while (s0itr.hasNext()) {
-			
-			// Gets a s0 value
-			BDD c = s0itr.nextBDD();
-			long s0 = c.scanVar(s0dom).longValue();
-			c.free();
-			
-			// Appends s0 to out
-			Object decoded = null;;
-			switch (print.type) {
-			case Print.INTEGER: decoded = s0; break;
-			case Print.FLOAT: decoded = manager.decodeFloat(s0); break;
-			case Print.CHARACTER: decoded = (char) s0; break;
-			case Print.STRING: decoded = manager.decodeString(s0); break;
+		if (print.type == Print.NOTHING) {
+			// Updates stack
+			c = abstractVars(bdd, spdom, s0dom);
+			c.andWith(spdom.ithVar(sp - 1));
+		} else {
+			boolean nd = false;
+			BDDIterator s0itr = manager.iterator(bdd, s0dom);
+			while (s0itr.hasNext()) {
+				
+				// Gets a s0 value
+				c = s0itr.nextBDD();
+				long s0 = c.scanVar(s0dom).longValue();
+				c.free();
+				
+				// Appends s0 to out
+				Object decoded = null;;
+				switch (print.type) {
+				case Print.INTEGER: decoded = VarManager.decode(s0, s0dom); break;
+				case Print.FLOAT: decoded = manager.decodeFloat(s0); break;
+				case Print.CHARACTER: decoded = (char) s0; break;
+				case Print.STRING: decoded = manager.decodeString(s0); break;
+				}
+				out.append(decoded);
+				if (s0itr.hasNext()) {
+					nd = true;
+					out.append(" ");
+				}
 			}
-			out.append(decoded);
-			if (s0itr.hasNext())
-				out.append(" ");
+			if (nd) {
+				out.insert(0, "[");
+				out.append("]");
+			}
+			
+			// Updates stack
+			c = abstractVars(bdd, spdom, s0dom, manager.getStackDomain(sp - 2));
+			c.andWith(spdom.ithVar(sp - 2));
 		}
 		
 		// Prints out
 		System.out.print(out);
 		if (print.newline) System.out.println();
-		
-		// Updates stack
-		BDD c = abstractVars(bdd, spdom, s0dom);
-		c.andWith(spdom.ithVar(sp - 1));
 		
 		return new BDDSemiring(manager, c);
 	}

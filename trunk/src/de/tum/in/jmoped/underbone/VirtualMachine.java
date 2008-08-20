@@ -760,16 +760,19 @@ public class VirtualMachine {
 				}
 				
 				case ExprType.PRINT: {
-					Number s0 = frame.pop();
 					Print print = (Print) d.value;
 					switch (print.type) {
-					case Print.INTEGER: System.out.print(s0.longValue()); break;
-					case Print.FLOAT: System.out.print(s0.doubleValue()); break;
-					case Print.CHARACTER: System.out.print((char) s0.intValue()); break;
-					case Print.STRING: System.out.print(strings.get(s0.intValue())); break;
+					case Print.NOTHING: break;
+					case Print.INTEGER: System.out.print(frame.pop().longValue()); break;
+					case Print.FLOAT: System.out.print(frame.pop().doubleValue()); break;
+					case Print.CHARACTER: System.out.print((char) frame.pop().intValue()); break;
+					case Print.STRING: System.out.print(strings.get(frame.pop().intValue())); break;
 					}
 					if (print.newline)
 						System.out.println();
+					
+					// Pops the PrintStream instance
+					frame.pop();
 					break;
 				}
 				
