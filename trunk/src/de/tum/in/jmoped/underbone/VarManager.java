@@ -50,7 +50,7 @@ public class VarManager {
 	
 	private boolean lazy;
 	
-	static int varcopy = 3;
+	private static final int varcopy = 3;
 	
 	int globalcopy;
 	
@@ -59,7 +59,7 @@ public class VarManager {
 	 */
 	private HashMap<String, Variable> globals;
 	
-	private HashSet<Integer> sharedDomIndex;
+//	private HashSet<Integer> sharedDomIndex;
 	
 	// Domains of all variables
 	BDDDomain[] doms;
@@ -87,8 +87,10 @@ public class VarManager {
 	 */
 	int gnum;
 	
-	// Starting domain index of globals
-	int g0;
+	/*
+	 *  Starting domain index of globals.
+	 */
+	private static final int g0 = 0;
 	
 	// Starting domain index of locals
 	int l0;
@@ -108,7 +110,7 @@ public class VarManager {
 	/**
 	 * Maps names of constants to their values.
 	 */
-	private HashMap<String, Integer> constants = new HashMap<String, Integer>();
+	private HashMap<String, Integer> constants;
 	
 	/**
 	 * Verbosity level.
@@ -144,8 +146,9 @@ public class VarManager {
 			int smax, int lvmax, int tbound, boolean lazy) {
 		
 		maxNodeNum = 0;
-		log("bits: %d, heapSizes: %s, g: %s, smax: %s, lvmax: %d, tbound %d%n",
-				bits, Arrays.toString(heapSizes), g, smax, lvmax, tbound);
+		if (log())
+			log("bits: %d, heapSizes: %s, g: %s, smax: %s, lvmax: %d, tbound %d%n",
+					bits, Arrays.toString(heapSizes), g, smax, lvmax, tbound);
 		this.bits = bits;
 		this.size = 1 << bits;
 		this.maxint = (int) size/2 - 1;
@@ -173,22 +176,22 @@ public class VarManager {
 		s++;	// ret var
 		long[] domSize = new long[s];
 		
-		if (multithreading())
-			sharedDomIndex = new HashSet<Integer>((int) (1.5*tbound*heapLength));
+//		if (multithreading())
+//			sharedDomIndex = new HashSet<Integer>((int) (1.5*tbound*heapLength));
 		
 		// Global variables
 		int index = 0;
-		g0 = index;
+//		g0 = index;
 		if (g != null && !g.isEmpty()) {
 			
 			globals = new HashMap<String, Variable>((int) (1.4 * g.size()));
 			for (Variable v : g) {
 				
 				v.setIndex(index);
-				log("%s (%d)%n", v.name, v.getIndex());
-				if (multithreading() && v.isShared()) {
-					sharedDomIndex.add(index);
-				}
+				if (log()) log("%s (%d)%n", v.name, v.getIndex());
+//				if (multithreading() && v.isShared()) {
+//					sharedDomIndex.add(index);
+//				}
 				long gsize = (long) Math.pow(2, v.getBits(bits));
 				for (int i = 0; i < globalcopy; i++)
 					domSize[index++] = gsize;
@@ -202,20 +205,20 @@ public class VarManager {
 			
 			// Heap pointer
 			hpDomIndex = index;
-			log("heap pointer (%d)%n", index);
-			if (multithreading()) {
-				sharedDomIndex.add(index);
-			}
+			if (log()) log("heap pointer (%d)%n", index);
+//			if (multithreading()) {
+//				sharedDomIndex.add(index);
+//			}
 			for (int i = 0; i < globalcopy; i++)
 				domSize[index++] = size;
 			gnum++;
 			
 			// Heap: at zero
 			hDomIndex = index;
-			log("heap[0] (%d)%n", index);
-			if (multithreading()) {
-				sharedDomIndex.add(index);
-			}
+			if (log()) log("heap[0] (%d)%n", index);
+//			if (multithreading()) {
+//				sharedDomIndex.add(index);
+//			}
 			for (int j = 0; j < globalcopy; j++)
 				domSize[index++] = 2;
 			gnum++;
@@ -223,10 +226,10 @@ public class VarManager {
 			// Heap: the rest
 			for (int i = 1; i < heapLength; i++) {
 				
-				log("heap[%d] - index: %d, size: %d%n", i, index, heapSizes[i]);
-				if (multithreading()) {
-					sharedDomIndex.add(index);
-				}
+				if (log()) log("heap[%d] - index: %d, size: %d%n", i, index, heapSizes[i]);
+//				if (multithreading()) {
+//					sharedDomIndex.add(index);
+//				}
 				for (int j = 0; j < globalcopy; j++)
 					domSize[index++] = heapSizes[i];
 				gnum++;
@@ -243,7 +246,7 @@ public class VarManager {
 			
 			lvDomIndex = index;
 			for (int i = 0; i < lvmax; i++) {
-				log("lv%d (%d)%n", i, index);
+				if (log()) log("lv%d (%d)%n", i, index);
 				for (int j = 0; j < varcopy; j++)
 					domSize[index++] = size;
 			}
@@ -255,14 +258,14 @@ public class VarManager {
 		if (smax > 0) {
 			
 			// Stack pointer
-			log("stack pointer (%d)%n", index);
+			if (log()) log("stack pointer (%d)%n", index);
 			spDomIndex = index;
 			domSize[index++] = smax + 1;
 			
 			// Stack element
 			sDomIndex = index;
 			for (int i = 0; i < smax; i++) {
-				log("stack%d (%d)%n", i, index);
+				if (log()) log("stack%d (%d)%n", i, index);
 				domSize[index++] = size;
 			}
 		} else {
@@ -286,7 +289,6 @@ public class VarManager {
 	}
 	
 	public int getMaxLocalVars() {
-		
 		return lvmax;
 	}
 	
@@ -311,14 +313,12 @@ public class VarManager {
 		return maxNodeNum;
 	}
 	
-//	private static int[] gindex = new int[] { 0, 1, 2, 3, 4 };
-	
 	/**
 	 * Initializes variables.
 	 */
 	public BDD initVars() {
 		
-		// Initializes G3 in case of lazy splitting
+		// Initializes G3 (instead of G0) in case of lazy splitting
 		int shifted = (multithreading() && lazy()) ? gindex[3] : 0;
 		
 		// Initializes global variables
@@ -353,22 +353,28 @@ public class VarManager {
 	public BDD initSharedVars() {
 		
 		BDD a = factory.one();
-//		for (int i = 0; i < gnum; i++) {
-//			a.andWith(doms[g0 + globalcopy*i].ithVar(0));
-//		}
-		for (Integer i : sharedDomIndex) {
-			if (i == hpDomIndex) a.andWith(doms[i].ithVar(1));
-			else a.andWith(doms[i].ithVar(0));
+		for (int i = 0; i < gnum; i++) {
+			int index = g0 + globalcopy*i;
+			if (index == hpDomIndex) a.andWith(doms[index].ithVar(1));
+			else a.andWith(doms[index].ithVar(0));
 		}
+//		for (Integer i : sharedDomIndex) {
+//			if (i == hpDomIndex) a.andWith(doms[i].ithVar(1));
+//			else a.andWith(doms[i].ithVar(0));
+//		}
 		
 		return a;
 	}
 	
 	public Integer getConstant(String name) {
+		if (constants == null)	// Shouldn't be possible, a precaution.
+			constants = new HashMap<String, Integer>();
 		return constants.get(name);
 	}
 	
 	public void putConstant(String name, Integer value) {
+		if (constants == null)
+			constants = new HashMap<String, Integer>();
 		constants.put(name, value);
 	}
 	
@@ -386,68 +392,17 @@ public class VarManager {
 		return a;
 	}
 	
-	private BDDVarSet globalVarSet = null;
-	
-	/**
-	 * Gets BDDVarSet of G0.
-	 * 
-	 * @return
-	 */
-	private BDDVarSet getGlobalVarSet() {
-		
-		if (globalVarSet != null) return globalVarSet;
-		
-		int i = 0;
-		BDDDomain[] d = new BDDDomain[gnum];
-		if (globals != null) {
-			for (Variable var : globals.values())
-				d[i++] = doms[var.getIndex()];
-		}
-		
-		if (getHeapSize() > 1) {
-			
-			d[i++] = getHeapPointerDomain();
-			for (int j = 0; j < getHeapSize(); j++)
-				d[i++] = getHeapDomain(j);
-		}
-		
-		globalVarSet = factory.makeSet(d);
-		return globalVarSet;
-	}
-	
-	/**
-	 * Abstracts global variables (G0) from BDD a.
-	 * 
-	 * @param a the BDD
-	 * @return the abstracted BDD
-	 */
-	public BDD abstractGlobals(BDD a) {
-		
-		BDDVarSet gvs = getGlobalVarSet();
-		return a.exist(gvs);
-	}
-	
-	private BDDVarSet localVarSet = null;
-	
-	private BDDVarSet getLocalVarSet() {
-		
-		if (localVarSet != null) return localVarSet;
-		
-		int i = 0;
-		BDDDomain[] d = new BDDDomain[(smax > 0) ? smax + 1 + lvmax : lvmax];
-		if (smax > 0) {
-			
-			d[i++] = getStackPointerDomain();
-			for (int j = 0; j < smax; j++)
-				d[i++] = getStackDomain(j);
-		}
-		for (int j = 0; j < lvmax; j++) {
-			d[i++] = getLocalVarDomain(j);
-		}
-		
-		localVarSet = factory.makeSet(d);
-		return localVarSet;
-	}
+//	/**
+//	 * Abstracts global variables (G0) from BDD a.
+//	 * 
+//	 * @param a the BDD
+//	 * @return the abstracted BDD
+//	 */
+//	public BDD abstractGlobals(BDD a) {
+//		
+//		BDDVarSet gvs = getGlobalVarSet();
+//		return a.exist(gvs);
+//	}
 	
 	/**
 	 * Abstracts local variables from BDD a.
@@ -461,84 +416,15 @@ public class VarManager {
 		return a.exist(lvs);
 	}
 	
-	private BDDVarSet sharedVarSet = null;
-	private BDDVarSet nonSharedVarSet = null;
-	
-	private BDDVarSet getNonSharedVarSet() {
-		
-		if (nonSharedVarSet != null) return nonSharedVarSet;
-		
-		BDDDomain[] d = new BDDDomain[doms.length - sharedDomIndex.size()];
-		int count = 0;
-		for (int i = 0; i < doms.length; i++) {
-			if (!sharedDomIndex.contains(i))
-				d[count++] = doms[i];
-		}
-		nonSharedVarSet = factory.makeSet(d);
-		return nonSharedVarSet;
-	}
-	
 	public BDD abstractNonShared(BDD a) {
 		
 		return a.exist(getNonSharedVarSet());
-	}
-	
-	/**
-	 * Gets the shared var set.
-	 * 
-	 * @return the shared var set.
-	 */
-	public BDDVarSet getSharedVarSet() {
-		
-		if (sharedVarSet != null) return sharedVarSet;
-		
-		BDDDomain[] d = new BDDDomain[sharedDomIndex.size()];
-		int count = 0;
-		for (Integer i : sharedDomIndex) {
-			d[count++] = doms[i];
-		}
-		sharedVarSet = factory.makeSet(d);
-		return sharedVarSet;
-	}
-	
-	private BDDVarSet lvspVarSet = null;
-	
-	private BDDVarSet getLvSpVarSet() {
-		
-		if (lvspVarSet != null) return lvspVarSet;
-		
-		int i = 0;
-		BDDDomain[] d = new BDDDomain[(smax > 0) ? lvmax + 1 : lvmax];
-		if (smax > 0) {
-			d[i++] = getStackPointerDomain();
-		}
-		for (int j = 0; j < lvmax; j++) {
-			d[i++] = getLocalVarDomain(j);
-		}
-		
-		lvspVarSet = factory.makeSet(d);
-		return lvspVarSet;
 	}
 	
 	public BDD abstractLocalVarsAndStackPointer(BDD a) {
 		
 		BDDVarSet lvspvs = getLvSpVarSet();
 		return a.exist(lvspvs);
-	}
-	
-	private BDDVarSet sVarSet = null;
-	
-	private BDDVarSet getStackVarSet() {
-		
-		if (sVarSet != null) return sVarSet;
-		
-		BDDDomain[] d = new BDDDomain[smax];
-		for (int i = 0; i < smax; i++) {
-			d[i] = getStackDomain(i);
-		}
-		
-		sVarSet = factory.makeSet(d);
-		return sVarSet;
 	}
 	
 	public BDD abstractStack(BDD a) {
@@ -882,8 +768,6 @@ public class VarManager {
 	
 	private BDD[] equals;
 	
-//	private BDD G0L0equalsG1L1 = null;
-	
 	public BDD buildG0L0equalsG1L1() {
 		if (equals == null) 
 			equals = new BDD[EQ_NUM];
@@ -905,8 +789,6 @@ public class VarManager {
 		return G0L0equalsG1L1;
 	}
 	
-//	private BDD G0equalsG3;
-	
 	public BDD buildG0equalsG3() {
 		if (equals == null) equals = new BDD[EQ_NUM];
 		
@@ -922,8 +804,6 @@ public class VarManager {
 		equals[EQ_G0_G3] = G0equalsG3;
 		return G0equalsG3;
 	}
-	
-//	private BDD G3equalsG4;
 	
 	public BDD buildG3equalsG4() {
 		if (equals == null) 
@@ -1191,7 +1071,8 @@ public class VarManager {
 		log("a: %s%n", a.toStringWithDomains());
 		
 		// Abstracts G0 and L0
-		BDDVarSet abs = getGlobalVarSet().union(getLocalVarSet());
+//		BDDVarSet abs = getGlobalVarSet().union(getLocalVarSet());
+		BDDVarSet abs = getG0VarSet().union(getLocalVarSet());
 		BDD b = a.exist(abs);
 		abs.free();
 		
@@ -1254,13 +1135,69 @@ public class VarManager {
 		return bp;
 	}
 	
-	private ArrayList<String> strings = new ArrayList<String>();
+	private void freeCache() {
+		if (equals != null) {
+			for (BDD equal : equals) {
+				if (equal == null) continue;
+				equal.free();
+				equal = null;
+			}
+		}
+		
+		if (g3g4ordering != null) {
+			g3g4ordering.free();
+			g3g4ordering = null;
+		}
+		
+		if (pairings != null) {
+			for (BDDPairing pairing : pairings) {
+				if (pairing == null) continue;
+				pairing = null;
+			}
+		}
+		
+		if (varsets != null) {
+			for (BDDVarSet varset : varsets) {
+				if (varset == null) continue;
+				varset.free();
+				varset = null;
+			}
+		}
+		
+		for (BDDVarSet varset : varSetWithout.values()) {
+			varset.free();
+		}
+		varSetWithout.clear();
+	}
+	
+	public BDD ithVar(BDDDomain dom, int value) {
+		long max = dom.size().longValue()/2;
+        if (value >= max || value < -max) {
+        	dom.extendCapacity(value);
+        	int index = dom.getIndex();
+        	if (index < l0) {
+            	// Globals
+        		for (int i = 1; i < globalcopy; i++)
+        			doms[i].extendCapacity(value);
+        	} else if (index < spDomIndex) {
+        		// Locals
+        		for (int i = 1; i < varcopy; i++)
+        			doms[i].extendCapacity(value);
+        	}
+        	freeCache();
+        }
+        return dom.ithVar(encode(value, dom));
+	}
+	
+	private ArrayList<String> strings;
 	
 	public List<String> getStrings() {
 		return strings;
 	}
 	
 	public long encode(String raw, BDDDomain dom) {
+		if (strings == null)
+			strings = new ArrayList<String>();
 		
 		// Adds a dummy string at index zero for preventing NPE
 		if (strings.isEmpty())
@@ -1281,7 +1218,7 @@ public class VarManager {
 		return strings.get((int) encoded);
 	}
 	
-	private ArrayList<Float> floats = new ArrayList<Float>();
+	private ArrayList<Float> floats;
 	
 	public List<Float> getFloats() {
 		return floats;
@@ -1295,6 +1232,9 @@ public class VarManager {
 	 * @return
 	 */
 	public long encode(float raw, BDDDomain dom) {
+		if (floats == null)
+			floats = new ArrayList<Float>();
+		
 		int index = floats.indexOf(raw);
 		if (index != -1) return index;
 		
@@ -1674,17 +1614,22 @@ public class VarManager {
 	private static final int VARSET_G0 = 8;
 	private static final int VARSET_G3 = 9;
 	private static final int VARSET_G4 = 10;
-	private static final int VARSET_NUM = 11;
+	private static final int VARSET_L0 = 11;
+	private static final int VARSET_LVSP = 12;
+	private static final int VARSET_NSHARED = 13;
+	private static final int VARSET_SHARED = 14;
+	private static final int VARSET_STACK = 15;
+	private static final int VARSET_NUM = 16;
 	
 	private BDDVarSet[] varsets;
 	
-//	private static enum VarSetType {
-//		G0L0, G0G1G2L0L1L2, G0L0G1L1, L0G1L1, L0G1L1G2L2, G0G4, G1L1, G2L2, G0, G3, G4;
-//	}
-//	
-//	private EnumMap<VarSetType, BDDVarSet> varsets 
-//			= new EnumMap<VarSetType, BDDVarSet>(VarSetType.class);
-	
+	/**
+	 * Stores the variable set specified by the domains <code>d</code>.
+	 * 
+	 * @param type the type of the variable set.
+	 * @param d the domains.
+	 * @return the variable set.
+	 */
 	private BDDVarSet putVarSet(int type, BDDDomain[] d) {
 		if (varsets == null)
 			varsets = new BDDVarSet[VARSET_NUM];
@@ -1860,6 +1805,127 @@ public class VarManager {
 		return getGxVarSet(VARSET_G4, 4);
 	}
 	
+//	private BDDVarSet localVarSet = null;
+	
+	private BDDVarSet getLocalVarSet() {
+		
+		if (varsets != null && varsets[VARSET_L0] != null) 
+			return varsets[VARSET_L0];
+		
+		int i = 0;
+		BDDDomain[] d = new BDDDomain[(smax > 0) ? smax + 1 + lvmax : lvmax];
+		if (smax > 0) {
+			
+			d[i++] = getStackPointerDomain();
+			for (int j = 0; j < smax; j++)
+				d[i++] = getStackDomain(j);
+		}
+		for (int j = 0; j < lvmax; j++) {
+			d[i++] = getLocalVarDomain(j);
+		}
+		
+		return putVarSet(VARSET_L0, d);
+	}
+	
+//	private BDDVarSet lvspVarSet = null;
+	
+	private BDDVarSet getLvSpVarSet() {
+		
+		if (varsets != null && varsets[VARSET_LVSP] != null) 
+			return varsets[VARSET_LVSP];
+		
+		int i = 0;
+		BDDDomain[] d = new BDDDomain[(smax > 0) ? lvmax + 1 : lvmax];
+		if (smax > 0) {
+			d[i++] = getStackPointerDomain();
+		}
+		for (int j = 0; j < lvmax; j++) {
+			d[i++] = getLocalVarDomain(j);
+		}
+		
+		return putVarSet(VARSET_LVSP, d);
+	}
+	
+	private BDDVarSet getNonSharedVarSet() {
+		
+		if (varsets != null && varsets[VARSET_NSHARED] != null) 
+			return varsets[VARSET_NSHARED];
+		
+		// Here we use the fact that g0 is always zero
+		int max = globalcopy*gnum;
+		BDDDomain[] d = new BDDDomain[doms.length - gnum];
+		int count = 0;
+		for (int i = 0; i < doms.length; i++) {
+			if (i < max && i%globalcopy == 0)	// Shortcuts shared vars
+				continue;
+			d[count++] = doms[i];
+		}
+		
+		return putVarSet(VARSET_NSHARED, d);
+	}
+	
+	/**
+	 * Gets the shared var set.
+	 * 
+	 * @return the shared var set.
+	 */
+	public BDDVarSet getSharedVarSet() {
+		
+		if (varsets != null && varsets[VARSET_SHARED] != null) 
+			return varsets[VARSET_SHARED];
+		
+		BDDDomain[] d = new BDDDomain[gnum];
+		for (int i = 0; i < gnum; i++) {
+			d[i] = doms[g0 + globalcopy*i];
+		}
+		
+		return putVarSet(VARSET_SHARED, d);
+	}
+	
+//	private BDDVarSet sVarSet = null;
+	
+	private BDDVarSet getStackVarSet() {
+		
+		if (varsets != null && varsets[VARSET_STACK] != null) 
+			return varsets[VARSET_STACK];
+		
+		BDDDomain[] d = new BDDDomain[smax];
+		for (int i = 0; i < smax; i++) {
+			d[i] = getStackDomain(i);
+		}
+		
+		return putVarSet(VARSET_STACK, d);
+	}
+	
+//	private BDDVarSet globalVarSet = null;
+//	
+//	/**
+//	 * Gets BDDVarSet of G0.
+//	 * 
+//	 * @return
+//	 */
+//	private BDDVarSet getGlobalVarSet() {
+//		
+//		if (globalVarSet != null) return globalVarSet;
+//		
+//		int i = 0;
+//		BDDDomain[] d = new BDDDomain[gnum];
+//		if (globals != null) {
+//			for (Variable var : globals.values())
+//				d[i++] = doms[var.getIndex()];
+//		}
+//		
+//		if (getHeapSize() > 1) {
+//			
+//			d[i++] = getHeapPointerDomain();
+//			for (int j = 0; j < getHeapSize(); j++)
+//				d[i++] = getHeapDomain(j);
+//		}
+//		
+//		globalVarSet = factory.makeSet(d);
+//		return globalVarSet;
+//	}
+	
 	/*************************************************************************
 	 * Methods for renaming BDD variables
 	 *************************************************************************/
@@ -1871,13 +1937,6 @@ public class VarManager {
 	private static final int PAIR_NUM = 4;
 	
 	private BDDPairing[] pairings;
-	
-//	private static enum PairingType {
-//		G1L1_G2L2, G0_G2, G0_G3, G3_G4;
-//	}
-	
-//	private EnumMap<PairingType, BDDPairing> pairings 
-//			= new EnumMap<PairingType, BDDPairing>(PairingType.class);
 	
 	private BDDPairing putPairing(int type, BDDDomain[] d1, BDDDomain[] d2) {
 		if (pairings == null)
@@ -1964,6 +2023,10 @@ public class VarManager {
 		log(1, msg, args);
 	}
 	
+	private static boolean log() {
+		return verbosity >= 2;
+	}
+	
 	private static void log(int threshold, String msg, Object... args) {
 		if (verbosity >= threshold)
 			logger.fine(String.format(msg, args));
@@ -1982,14 +2045,14 @@ public class VarManager {
 	
 	public void free() {
 		
-		if (localVarSet != null) localVarSet.free();
+//		if (localVarSet != null) localVarSet.free();
 		
-		if (sharedVarSet != null) sharedVarSet.free();
-		if (nonSharedVarSet != null) nonSharedVarSet.free();
+//		if (sharedVarSet != null) sharedVarSet.free();
+//		if (nonSharedVarSet != null) nonSharedVarSet.free();
 		
-		if (lvspVarSet != null) lvspVarSet.free();
+//		if (lvspVarSet != null) lvspVarSet.free();
 		
-		if (globalVarSet != null) globalVarSet.free();
+//		if (globalVarSet != null) globalVarSet.free();
 		
 		if (varSetWithout != null) {
 			for (BDDVarSet a : varSetWithout.values())
