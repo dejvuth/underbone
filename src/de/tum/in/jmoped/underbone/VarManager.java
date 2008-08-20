@@ -4,7 +4,6 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -99,7 +98,7 @@ public class VarManager {
 	
 	private int[] gindex;
 	
-	/* 
+	/** 
 	 * Maps a domain index of a variable to a variable set 
 	 * of all variables without that variable.
 	 * Use for abstracting other variables away. 
@@ -314,6 +313,9 @@ public class VarManager {
 	
 //	private static int[] gindex = new int[] { 0, 1, 2, 3, 4 };
 	
+	/**
+	 * Initializes variables.
+	 */
 	public BDD initVars() {
 		
 		// Initializes G3 in case of lazy splitting
@@ -498,84 +500,6 @@ public class VarManager {
 		sharedVarSet = factory.makeSet(d);
 		return sharedVarSet;
 	}
-	
-//	private BDDVarSet[] gtidVarSet;
-//	
-//	/**
-//	 * TODO copied from getGtidVarSetWithout
-//	 * 
-//	 * @param tid
-//	 * @return
-//	 */
-//	BDDVarSet getGtidVarSet(int tid) {
-//		
-//		if (gtidVarSet == null)
-//			gtidVarSet = new BDDVarSet[tbound];
-//		
-//		// Returns cached
-//		if (gtidVarSet[tid - 1] != null)
-//			return gtidVarSet[tid - 1];
-//		
-//		// Global vars
-//		int offset = varcopy + tid - 1;
-//		int i = 0;
-//		BDDDomain[] d = new BDDDomain[gnum];
-//		if (globals != null) {
-//			for (Variable var : globals.values())
-//				d[i++] = doms[var.getIndex() + offset];
-//		}
-//		
-//		// Heap
-//		if (getHeapSize() > 1) {
-//			d[i++] = doms[hpDomIndex + offset];
-//			for (int j = 0; j < getHeapSize(); j++)
-//				d[i++] = doms[hDomIndex + globalcopy*j + offset];
-//		}
-//		
-//		gtidVarSet[tid - 1] = factory.makeSet(d);
-//		return gtidVarSet[tid - 1];
-//	}
-	
-//	private BDDVarSet[] gtidVarSetWithout;
-//	
-//	BDDVarSet getGtidVarSetWithout(int tid) {
-//		
-//		if (gtidVarSetWithout == null)
-//			gtidVarSetWithout = new BDDVarSet[tbound];
-//		
-//		// Returns cached
-//		if (gtidVarSetWithout[tid - 1] != null)
-//			return gtidVarSetWithout[tid - 1];
-//		
-//		// Global vars
-//		BDDDomain[] d = new BDDDomain[(tbound - 1)*gnum];
-//		int index = 0;
-//		if (globals != null) {
-//			for (Variable var : globals.values()) {
-//				for (int i = 1; i <= tbound; i++) {
-//					if (i == tid) continue;
-//					d[index++] = doms[var.getIndex() + varcopy + i - 1];
-//				}
-//			}
-//		}
-//		
-//		// Heap
-//		if (getHeapSize() > 1) {
-//			for (int i = 1; i <= tbound; i++) {
-//				if (i == tid) continue;
-//				d[index++] = doms[hpDomIndex + varcopy + i - 1];
-//			}
-//			for (int j = 0; j < getHeapSize(); j++) {
-//				for (int i = 1; i <= tbound; i++) {
-//					if (i == tid) continue;
-//					d[index++] = doms[hDomIndex + globalcopy*j + varcopy + i - 1];
-//				}
-//			}
-//		}
-//		
-//		gtidVarSetWithout[tid - 1] = factory.makeSet(d);
-//		return gtidVarSetWithout[tid - 1];
-//	}
 	
 	private BDDVarSet lvspVarSet = null;
 	
@@ -951,13 +875,23 @@ public class VarManager {
 		return a;
 	}
 	
-	private BDD G0L0equalsG1L1 = null;
+	private static final int EQ_G0L0_G1L1 = 0;
+	private static final int EQ_G0_G3 = 1;
+	private static final int EQ_G3_G4 = 2;
+	private static final int EQ_NUM = 3;
+	
+	private BDD[] equals;
+	
+//	private BDD G0L0equalsG1L1 = null;
 	
 	public BDD buildG0L0equalsG1L1() {
+		if (equals == null) 
+			equals = new BDD[EQ_NUM];
 		
-		if (G0L0equalsG1L1 != null) return G0L0equalsG1L1;
+		if (equals[EQ_G0L0_G1L1] != null) 
+			return equals[EQ_G0L0_G1L1];
 		
-		G0L0equalsG1L1 = factory.one();
+		BDD G0L0equalsG1L1 = factory.one();
 		for (int i = 0; i < gnum; i++) {
 			int index = g0 + globalcopy*i;
 			G0L0equalsG1L1.andWith(doms[index].buildEquals(doms[index + gindex[1]]));
@@ -967,38 +901,44 @@ public class VarManager {
 			G0L0equalsG1L1.andWith(doms[index].buildEquals(doms[index + 1]));
 		}
 		
+		equals[EQ_G0L0_G1L1] = G0L0equalsG1L1;
 		return G0L0equalsG1L1;
 	}
 	
-	private BDD G0equalsG3;
+//	private BDD G0equalsG3;
 	
 	public BDD buildG0equalsG3() {
+		if (equals == null) equals = new BDD[EQ_NUM];
 		
-		if (G0equalsG3 != null)
-			return G0equalsG3;
+		if (equals[EQ_G0_G3] != null)
+			return equals[EQ_G0_G3];
 		
-		G0equalsG3 = factory.one();
+		BDD G0equalsG3 = factory.one();
 		for (int i = 0; i < gnum; i++) {
 			int index = g0 + globalcopy*i;
 			G0equalsG3.andWith(doms[index].buildEquals(doms[index + gindex[3]]));
 		}
 		
+		equals[EQ_G0_G3] = G0equalsG3;
 		return G0equalsG3;
 	}
 	
-	private BDD G3equalsG4;
+//	private BDD G3equalsG4;
 	
 	public BDD buildG3equalsG4() {
+		if (equals == null) 
+			equals = new BDD[EQ_NUM];
 		
-		if (G3equalsG4 != null)
-			return G3equalsG4;
+		if (equals[EQ_G3_G4] != null)
+			return equals[EQ_G3_G4];
 		
-		G3equalsG4 = factory.one();
+		BDD G3equalsG4 = factory.one();
 		for (int i = 0; i < gnum; i++) {
 			int index = g0 + globalcopy*i;
 			G3equalsG4.andWith(doms[index + gindex[3]].buildEquals(doms[index + gindex[4]]));
 		}
 		
+		equals[EQ_G3_G4] = G3equalsG4;
 		return G3equalsG4;
 	}
 	
@@ -1655,40 +1595,50 @@ public class VarManager {
 	 * Methods for computing BDDDomain[]
 	 *************************************************************************/
 	
-	private static enum DomainType {
-		G0, G1, G2, G3, G4, G1L1, G2L2;
-	}
+	private static final int DOM_G0 = 0;
+	private static final int DOM_G1 = 1;
+	private static final int DOM_G2 = 2;
+	private static final int DOM_G3 = 3;
+	private static final int DOM_G4 = 4;
+	private static final int DOM_G1L1 = 5;
+	private static final int DOM_G2L2 = 6;
+	private static final int DOM_NUM = 7;
 	
-	private EnumMap<DomainType, BDDDomain[]> domains 
-			= new EnumMap<DomainType, BDDDomain[]>(DomainType.class);
+	private BDDDomain[][] domains;
 	
-	private BDDDomain[] putGxDomain(DomainType type, int x) {
-		if (domains.containsKey(type))
-			return domains.get(type);
+	private BDDDomain[] putGxDomain(int type, int x) {
+		if (domains == null) 
+			domains = new BDDDomain[DOM_NUM][];
+		
+		if (domains[type] != null)
+			return domains[type];
 		
 		BDDDomain[] d = new BDDDomain[gnum];
 		for (int i = 0; i < gnum; i++)
 			d[i] = doms[g0 + globalcopy*i + gindex[x]];
 		
-		domains.put(type, d);
+		domains[type] = d;
 		return d;
 	}
 	
 	private BDDDomain[] getGxDomain(int x) {
 		switch (x) {
-		case 0: return putGxDomain(DomainType.G0, 0);
-		case 1: return putGxDomain(DomainType.G1, 1);
-		case 2: return putGxDomain(DomainType.G2, 2);
-		case 3: return putGxDomain(DomainType.G3, 3);
-		case 4: return putGxDomain(DomainType.G4, 4);
+		case 0: return putGxDomain(DOM_G0, 0);
+		case 1: return putGxDomain(DOM_G1, 1);
+		case 2: return putGxDomain(DOM_G2, 2);
+		case 3: return putGxDomain(DOM_G3, 3);
+		case 4: return putGxDomain(DOM_G4, 4);
 		}
 		
 		throw new RemoplaError("Unexpected G%d domain", x);
 	}
 	
-	private BDDDomain[] putGxLxDomain(DomainType type, int x) {
-		if (domains.containsKey(type))
-			return domains.get(type);
+	private BDDDomain[] putGxLxDomain(int type, int x) {
+		if (domains == null) 
+			domains = new BDDDomain[DOM_NUM][];
+		
+		if (domains[type] != null)
+			return domains[type];
 		
 		BDDDomain[] d = new BDDDomain[gnum + lvmax];
 		int j = 0;
@@ -1697,39 +1647,57 @@ public class VarManager {
 		for (int i = 0; i < lvmax; i++)
 			d[j++] = doms[l0 + varcopy*i + x];
 		
-		domains.put(type, d);
+		domains[type] = d;
 		return d;
 	}
 	
 	private BDDDomain[] getG1L1Domain() {
-		return putGxLxDomain(DomainType.G1L1, 1);
+		return putGxLxDomain(DOM_G1L1, 1);
 	}
 	
 	private BDDDomain[] getG2L2Domain() {
-		return putGxLxDomain(DomainType.G2L2, 2);
+		return putGxLxDomain(DOM_G2L2, 2);
 	}
 	
 	/*************************************************************************
 	 * Methods for computing BDDVarSet
 	 *************************************************************************/
 	
-	private static enum VarSetType {
-		G0L0, G0G1G2L0L1L2, G0L0G1L1, L0G1L1, L0G1L1G2L2, G0G4, G1L1, G2L2, G0, G3, G4;
-	}
+	private static final int VARSET_G0L0 = 0;
+	private static final int VARSET_G0G1G2L0L1L2 = 1;
+	private static final int VARSET_G0L0G1L1 = 2;
+	private static final int VARSET_L0G1L1 = 3;
+	private static final int VARSET_L0G1L1G2L2 = 4;
+	private static final int VARSET_G0G4 = 5;
+	private static final int VARSET_G1L1 = 6;
+	private static final int VARSET_G2L2 = 7;
+	private static final int VARSET_G0 = 8;
+	private static final int VARSET_G3 = 9;
+	private static final int VARSET_G4 = 10;
+	private static final int VARSET_NUM = 11;
 	
-	private EnumMap<VarSetType, BDDVarSet> varsets 
-			= new EnumMap<VarSetType, BDDVarSet>(VarSetType.class);
+	private BDDVarSet[] varsets;
 	
-	private BDDVarSet putVarSet(VarSetType type, BDDDomain[] d) {
+//	private static enum VarSetType {
+//		G0L0, G0G1G2L0L1L2, G0L0G1L1, L0G1L1, L0G1L1G2L2, G0G4, G1L1, G2L2, G0, G3, G4;
+//	}
+//	
+//	private EnumMap<VarSetType, BDDVarSet> varsets 
+//			= new EnumMap<VarSetType, BDDVarSet>(VarSetType.class);
+	
+	private BDDVarSet putVarSet(int type, BDDDomain[] d) {
+		if (varsets == null)
+			varsets = new BDDVarSet[VARSET_NUM];
+		
 		BDDVarSet vs = factory.makeSet(d);
-		varsets.put(type, vs);
+		varsets[type] = vs;
 		return vs;
 	}
 	
 	BDDVarSet getVarSet0() {
 		
-		if (varsets.containsKey(VarSetType.G0L0))
-			return varsets.get(VarSetType.G0L0);
+		if (varsets != null && varsets[VARSET_G0L0] != null)
+			return varsets[VARSET_G0L0];
 		
 		int base = gnum + lvmax;
 		BDDDomain[] d = new BDDDomain[base + ((smax > 0) ? smax + 1 : 0)];
@@ -1744,13 +1712,13 @@ public class VarManager {
 				d[j++] = getStackDomain(i);
 		}
 		
-		return putVarSet(VarSetType.G0L0, d);
+		return putVarSet(VARSET_G0L0, d);
 	}
 	
 	BDDVarSet getG0G1G2L0L1L2VarSet() {
 		
-		if (varsets.containsKey(VarSetType.G0G1G2L0L1L2))
-			return varsets.get(VarSetType.G0G1G2L0L1L2);
+		if (varsets != null && varsets[VARSET_G0G1G2L0L1L2] != null)
+			return varsets[VARSET_G0G1G2L0L1L2];
 		
 		BDDDomain[] d = new BDDDomain[3*gnum + 3*lvmax + ((smax > 0) ? smax + 1 : 0)];
 		int j = 0;
@@ -1770,13 +1738,13 @@ public class VarManager {
 				d[j++] = getStackDomain(i);
 		}
 		
-		return putVarSet(VarSetType.G0G1G2L0L1L2, d);
+		return putVarSet(VARSET_G0G1G2L0L1L2, d);
 	}
 	
 	BDDVarSet getG0L0G1L1VarSet() {
 		
-		if (varsets.containsKey(VarSetType.G0L0G1L1))
-			return varsets.get(VarSetType.G0L0G1L1);
+		if (varsets != null && varsets[VARSET_G0L0G1L1] != null)
+			return varsets[VARSET_G0L0G1L1];
 		
 		BDDDomain[] d = new BDDDomain[2*gnum + 2*lvmax + ((smax > 0) ? smax + 1 : 0)];
 		int j = 0;
@@ -1794,13 +1762,13 @@ public class VarManager {
 				d[j++] = getStackDomain(i);
 		}
 		
-		return putVarSet(VarSetType.G0L0G1L1, d);
+		return putVarSet(VARSET_G0L0G1L1, d);
 	}
 	
 	BDDVarSet getL0G1L1VarSet() {
 		
-		if (varsets.containsKey(VarSetType.L0G1L1))
-			return varsets.get(VarSetType.L0G1L1);
+		if (varsets != null && varsets[VARSET_L0G1L1] != null)
+			return varsets[VARSET_L0G1L1];
 		
 		BDDDomain[] d = new BDDDomain[gnum + 2*lvmax + ((smax > 0) ? smax + 1 : 0)];
 		int j = 0;
@@ -1816,13 +1784,13 @@ public class VarManager {
 				d[j++] = getStackDomain(i);
 		}
 		
-		return putVarSet(VarSetType.L0G1L1, d);
+		return putVarSet(VARSET_L0G1L1, d);
 	}
 	
 	BDDVarSet getL0G1L1G2L2VarSet() {
 		
-		if (varsets.containsKey(VarSetType.L0G1L1G2L2))
-			return varsets.get(VarSetType.L0G1L1G2L2);
+		if (varsets != null && varsets[VARSET_L0G1L1G2L2] != null)
+			return varsets[VARSET_L0G1L1G2L2];
 		
 		BDDDomain[] d = new BDDDomain[2*gnum + 3*lvmax + ((smax > 0) ? smax + 1 : 0)];
 		int j = 0;
@@ -1841,13 +1809,13 @@ public class VarManager {
 				d[j++] = getStackDomain(i);
 		}
 		
-		return putVarSet(VarSetType.L0G1L1G2L2, d);
+		return putVarSet(VARSET_L0G1L1G2L2, d);
 	}
 	
 	BDDVarSet getG0G4VarSet() {
 		
-		if (varsets.containsKey(VarSetType.G0G4))
-			return varsets.get(VarSetType.G0G4);
+		if (varsets != null && varsets[VARSET_G0G4] != null)
+			return varsets[VARSET_G0G4];
 		
 		BDDDomain[] d = new BDDDomain[2*gnum];
 		int j = 0;
@@ -1856,165 +1824,96 @@ public class VarManager {
 			d[j++] = doms[g0 + globalcopy*i + gindex[4]];
 		}
 		
-		return putVarSet(VarSetType.G0G4, d);
+		return putVarSet(VARSET_G0G4, d);
 	}
 	
 	BDDVarSet getG1L1VarSet() {
+		if (varsets != null && varsets[VARSET_G1L1] != null)
+			return varsets[VARSET_G1L1];
 		
-		if (varsets.containsKey(VarSetType.G1L1))
-			return varsets.get(VarSetType.G1L1);
-		
-//		BDDDomain[] d = new BDDDomain[gnum + lvmax];
-//		int j = 0;
-//		for (int i = 0; i < gnum; i++)
-//			d[j++] = doms[g0 + globalcopy*i + gindex[1]];
-//		for (int i = 0; i < lvmax; i++)
-//			d[j++] = doms[l0 + varcopy*i + 1];
-		
-		return putVarSet(VarSetType.G1L1, getG1L1Domain());
+		return putVarSet(VARSET_G1L1, getG1L1Domain());
 	}
 	
 	BDDVarSet getG2L2VarSet() {
+		if (varsets != null && varsets[VARSET_G2L2] != null)
+			return varsets[VARSET_G2L2];
 		
-		if (varsets.containsKey(VarSetType.G2L2))
-			return varsets.get(VarSetType.G2L2);
-		
-//		BDDDomain[] d = new BDDDomain[gnum + lvmax];
-//		int j = 0;
-//		for (int i = 0; i < gnum; i++)
-//			d[j++] = doms[g0 + globalcopy*i + gindex[2]];
-//		for (int i = 0; i < lvmax; i++)
-//			d[j++] = doms[l0 + varcopy*i + 2];
-		
-		return putVarSet(VarSetType.G2L2, getG2L2Domain());
+		return putVarSet(VARSET_G2L2, getG2L2Domain());
 	}
 	
-	private BDDVarSet getGxVarSet(VarSetType type, int x) {
-		if (varsets.containsKey(type))
-			return varsets.get(type);
+	private BDDVarSet getGxVarSet(int type, int x) {
+		if (varsets != null && varsets[type] != null)
+			return varsets[type];
 		
 		return putVarSet(type, getGxDomain(x));
 	}
 	
 	BDDVarSet getG0VarSet() {
-		return getGxVarSet(VarSetType.G0, 0);
+		return getGxVarSet(VARSET_G0, 0);
 	}
 	
 	BDDVarSet getG3VarSet() {
-		return getGxVarSet(VarSetType.G3, 3);
+		return getGxVarSet(VARSET_G3, 3);
 	}
 	
 	BDDVarSet getG4VarSet() {
-		return getGxVarSet(VarSetType.G4, 4);
+		return getGxVarSet(VARSET_G4, 4);
 	}
 	
 	/*************************************************************************
 	 * Methods for renaming BDD variables
 	 *************************************************************************/
 	
-	private static enum PairingType {
-		G1L1_G2L2, G0_G2, G0_G3, G3_G4;
-	}
+	private static final int PAIR_G1L1_G2L2 = 0;
+	private static final int PAIR_G0_G2 = 1;
+	private static final int PAIR_G0_G3 = 2;
+	private static final int PAIR_G3_G4 = 3;
+	private static final int PAIR_NUM = 4;
 	
-	private EnumMap<PairingType, BDDPairing> pairings 
-			= new EnumMap<PairingType, BDDPairing>(PairingType.class);
+	private BDDPairing[] pairings;
 	
-	private BDDPairing putPairing(PairingType type, BDDDomain[] d1, BDDDomain[] d2) {
+//	private static enum PairingType {
+//		G1L1_G2L2, G0_G2, G0_G3, G3_G4;
+//	}
+	
+//	private EnumMap<PairingType, BDDPairing> pairings 
+//			= new EnumMap<PairingType, BDDPairing>(PairingType.class);
+	
+	private BDDPairing putPairing(int type, BDDDomain[] d1, BDDDomain[] d2) {
+		if (pairings == null)
+			pairings = new BDDPairing[PAIR_NUM];
+		
 		BDDPairing p = factory.makePair();
 		p.set(d1, d2);
-		pairings.put(type, p);
+		pairings[type] = p;
 		return p;
 	}
 	
-//	/**
-//	 * Changes the signature of a from (...,G1,L1,...) to (...,G2,L2,...).
-//	 * The bdd a is mutated.
-//	 * 
-//	 * @param a
-//	 * @return
-//	 */
-//	BDD replaceG1L1withG2L2(BDD a) {
-//		
-//		
-//		
-//		for (int i = 0; i < gnum; i++) {
-//			int index = g0 + globalcopy*i;
-//			replaceWith(a, index + gindex[1], index + gindex[2]);
-//		}
-//		for (int i = 0; i < lvmax; i++) {
-//			int index = l0 + varcopy*i + 1;
-//			replaceWith(a, index, index + 1);
-//		}
-//		
-//		return a;
-//	}
-	
 	BDDPairing getG1L1pairG2L2() {
-		if (pairings.containsKey(PairingType.G1L1_G2L2))
-			return pairings.get(PairingType.G1L1_G2L2);
+		if (pairings != null && pairings[PAIR_G1L1_G2L2] != null)
+			return pairings[PAIR_G1L1_G2L2];
 		
-		return putPairing(PairingType.G1L1_G2L2, getG1L1Domain(), getG2L2Domain());
+		return putPairing(PAIR_G1L1_G2L2, getG1L1Domain(), getG2L2Domain());
 	}
 	
-//	private BDD replaceG0withGx(BDD a, int x) {
-//		for (int i = 0; i < gnum; i++) {
-//			int index = g0 + globalcopy*i;
-//			replaceWith(a, index, index + gindex[x]);
-//		}
-//		
-//		return a;
-//	}
-	
-//	BDD replaceG0withG2(BDD a) {
-//		return replaceG0withGx(a, 2);
-//	}
-	
-	private BDDPairing getGxpairGy(PairingType type, int x, int y) {
-		if (pairings.containsKey(type))
-			return pairings.get(type);
+	private BDDPairing getGxpairGy(int type, int x, int y) {
+		if (pairings != null && pairings[type] != null)
+			return pairings[type];
 		
 		return putPairing(type, getGxDomain(x), getGxDomain(y));
 	}
 	
 	BDDPairing getG0pairG2() {
-		return getGxpairGy(PairingType.G0_G2, 0, 2);
+		return getGxpairGy(PAIR_G0_G2, 0, 2);
 	}
 	
 	BDDPairing getG0pairG3() {
-		return getGxpairGy(PairingType.G0_G3, 0, 3);
+		return getGxpairGy(PAIR_G0_G3, 0, 3);
 	}
-	
-//	BDD replaceG0withG3(BDD a) {
-////		return replaceG0withGx(a, 3);
-//		return a.replaceWith(getG0pairG3());
-//	}
 	
 	BDDPairing getG3pairG4() {
-		return getGxpairGy(PairingType.G3_G4, 3, 4);
+		return getGxpairGy(PAIR_G3_G4, 3, 4);
 	}
-	
-//	BDD replaceG3withG4(BDD a) {
-//		for (int i = 0; i < gnum; i++) {
-//			int index = g0 + globalcopy*i;
-//			replaceWith(a, index + gindex[3], index + gindex[4]);
-//		}
-//		
-//		return a;
-//	}
-	
-//	BDD replaceG0withGtid(BDD a, int tid) {
-//		
-//		for (int i = 0; i < gnum; i++) {
-//			int index = g0 + globalcopy*i;
-//			replaceWith(a, index, index + varcopy + tid - 1);
-//		}
-//		
-//		return a;
-//	}
-	
-//	private BDD replaceWith(BDD a, int i1, int i2) {
-//		return a.replaceWith(factory.makePair(doms[i1], doms[i2]));
-//	}
 	
 	private BDD g3g4ordering;
 	
@@ -2092,60 +1991,24 @@ public class VarManager {
 		
 		if (globalVarSet != null) globalVarSet.free();
 		
-//		if (gtidVarSet != null) {
-//			for (int i = 0; i < tbound; i++)
-//				if (gtidVarSet[i] != null)
-//					gtidVarSet[i].free();
-//		}
-		
-//		if (gtidVarSetWithout != null) {
-//			for (int i = 0; i < tbound; i++)
-//				if (gtidVarSetWithout[i] != null)
-//					gtidVarSetWithout[i].free();
-//		}
-		
 		if (varSetWithout != null) {
 			for (BDDVarSet a : varSetWithout.values())
 				a.free();
 		}
 		
-		if (G0L0equalsG1L1 != null) G0L0equalsG1L1.free();
+		if (equals != null) {
+			for (int i = 0; i < equals.length; i++) {
+				if (equals[i] != null)
+					equals[i].free();
+			}
+		}
 		
-//		if (G0equalsGtid != null) {
-//			for (int i = 0; i < G0equalsGtid.length; i++) {
-//				if (G0equalsGtid[i] != null)
-//					G0equalsGtid[i].free();
-//			}
-//		}
-		
-		if (G0equalsG3 != null) G0equalsG3.free();
-		
-		if (G3equalsG4 != null) G3equalsG4.free();
-		
-		for (BDDVarSet vs : varsets.values())
-			vs.free();
-		
-//		if (VarSet0 != null) VarSet0.free();
-//		
-//		if (g0g1g2l0l1l2VarSet != null) g0g1g2l0l1l2VarSet.free();
-//		
-//		if (g0l0g1l1VarSet != null) g0l0g1l1VarSet.free();
-//		
-//		if (l0g1l1VarSet != null) l0g1l1VarSet.free();
-//		
-//		if (l0g1l1g2l2VarSet != null) l0g1l1g2l2VarSet.free();
-//		
-//		if (g0g4VarSet != null) g0g4VarSet.free();
-//		
-//		if (g1l1VarSet != null) g1l1VarSet.free();
-//		
-//		if (g2l2VarSet != null) g2l2VarSet.free();
-//		
-//		if (g0VarSet != null) g0VarSet.free();
-//		
-//		if (g3VarSet != null) g3VarSet.free();
-//		
-//		if (g4VarSet != null) g4VarSet.free();
+		if (varsets != null) {
+			for (int i = 0; i < varsets.length; i++) {
+				if (varsets[i] != null)
+					varsets[i].free();
+			}
+		}
 		
 		if (g3g4ordering != null) g3g4ordering.free();
 		

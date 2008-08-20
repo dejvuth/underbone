@@ -19,6 +19,7 @@ import de.tum.in.jmoped.underbone.expr.Monitorenter;
 import de.tum.in.jmoped.underbone.expr.New;
 import de.tum.in.jmoped.underbone.expr.Newarray;
 import de.tum.in.jmoped.underbone.expr.Poppush;
+import de.tum.in.jmoped.underbone.expr.Print;
 import de.tum.in.jmoped.underbone.expr.Return;
 import de.tum.in.jmoped.underbone.expr.Unaryop;
 import de.tum.in.jmoped.underbone.expr.Value;
@@ -416,7 +417,7 @@ public class Module {
 			case ExprType.NPE: break;
 			case ExprType.JUMP: s = jump(itr); toIterate = false; break;
 			case ExprType.POPPUSH: s = poppush(d); break;
-			case ExprType.PRINT: s = skip(); break;
+			case ExprType.PRINT: s = print(d); break;
 			case ExprType.PUSH: s = push(d); break;
 			case ExprType.RETURN: s = returnexpr(d); break;
 			case ExprType.STORE: s = store(d); break;
@@ -1096,7 +1097,7 @@ public class Module {
 		
 		if (pop == 1) {
 			StringBuilder b = new StringBuilder();
-			Utils.append(b, "%s = undef", s0(), sptr, sptr);
+			Utils.append(b, "%s = undef", s0());
 			if (push == 1) {
 				b.append(';');
 				return b.toString();
@@ -1114,6 +1115,12 @@ public class Module {
 			Utils.append(b, ", %s[%s - %d] = undef", stack, sptr, pop - 1);
 		Utils.append(b, ", %s = %s - %d;", sptr, sptr, pop - push);
 		return b.toString();
+	}
+	
+	private static String print(ExprSemiring d) {
+		Print print = (Print) d.value;
+		return String.format("%s = %s - %d",
+					sptr, sptr, (print.type == Print.NOTHING) ? 1 : 2);
 	}
 	
 	private static String push(ExprSemiring d) {
