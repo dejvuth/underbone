@@ -56,11 +56,6 @@ public class Remopla {
 	 * The maximum number of local variables
 	 */
 	int lvmax;
-
-	/**
-	 * The variable manager
-	 */
-	VarManager manager;
 	
 	/**
 	 * The Remopla modules
@@ -71,24 +66,6 @@ public class Remopla {
 	 * The initial label
 	 */
 	String init;
-	
-	/**
-	 * The initial finite automaton
-	 */
-	Fa fa;
-	
-	/**
-	 * The saturated automaton
-	 */
-	Fa post;
-	
-	/**
-	 * The saturator
-	 */
-	Sat sat;
-	
-	private DpnReach reach;
-	private VirtualMachine vm;
 	
 	/**
 	 * The listener
@@ -119,6 +96,129 @@ public class Remopla {
 	 * Verbosity level.
 	 */
 	private static int verbosity = 0;
+	
+	public Coverage coverage;
+	
+	public static enum CoverageMode {
+		BDDDOMAIN, BDDPOOL, EXPLICIT, EXECUTE;
+		
+		public boolean bdd() {
+			return this.equals(BDDDOMAIN) || this.equals(BDDPOOL);
+		}
+	}
+	
+	public static class Coverage {
+		CoverageMode mode;
+		int nthread;
+		int ncontext;
+		boolean lazy;
+		
+		public Coverage(CoverageMode mode, int nthread, int ncontext, boolean lazy) {
+			this.mode = mode;
+			this.nthread = nthread;
+			this.ncontext = ncontext;
+			this.lazy = lazy;
+		}
+		
+		public void free() {
+		}
+		
+		public String toString() {
+			return String.format("mode:%s, nthread:%d, ncontext:%d, lazy:%b",
+					mode, nthread, ncontext, lazy);
+		}
+	}
+	
+	private static class BDDCoverage extends Coverage {
+		String bddpackage;
+		int nodenum;
+		int cachesize;
+		
+		/**
+		 * The initial finite automaton
+		 */
+		Fa fa;
+		
+		/**
+		 * The saturated automaton
+		 */
+		Fa post;
+		
+		DpnReach reach;
+		
+		public BDDCoverage(CoverageMode mode, int nthread, int ncontext, 
+				boolean lazy, String bddpackage, int nodenum, int cachesize) {
+			super(mode, nthread, ncontext, lazy);
+			this.bddpackage = bddpackage;
+			this.nodenum = nodenum;
+			this.cachesize = cachesize;
+		}
+		
+		public void free() {
+			if (fa != null) {
+				log("Freeing fa ...");
+				fa.free();
+				fa = null;
+				log("done%n");
+			}
+			
+			if (post != null) {
+				log("Freeing post");
+				post.free();
+				post = null;
+			}
+			
+			reach = null;
+		}
+		
+		public String toString() {
+			return String.format("%s, bddpackage: %s, nodenum:%d, cachesize:%d", 
+					super.toString(), bddpackage, nodenum, cachesize);
+		}
+	}
+	
+	public static class BDDDomainCoverage extends BDDCoverage {
+		/**
+		 * The variable manager
+		 */
+		VarManager manager;
+		
+		public BDDDomainCoverage(int nthread, int ncontext, boolean lazy, 
+				String bddpackage, int nodenum, int cachesize) {
+			super(CoverageMode.BDDDOMAIN, nthread, ncontext, lazy, bddpackage, nodenum, cachesize);
+		}
+		
+		public void free() {
+			super.free();
+			if (manager != null) {
+				log("Freeing manager");
+				manager.free();
+				manager = null;
+			}
+		}
+	}
+	
+//	public static class BDDPoolCoverage extends BDDCoverage {
+//		public BDDPoolCoverage(String bddpackage, int nodenum, int cachesize) {
+//			super(CoverageMode.BDDPOOL, bddpackage, nodenum, cachesize);
+//		}
+//	}
+	
+	public static class ExplicitCoverage extends Coverage {
+		Fa post;
+		
+		public ExplicitCoverage(int nthread, int ncontext, boolean lazy) {
+			super(CoverageMode.EXPLICIT, nthread, ncontext, lazy);
+		}
+	}
+	
+	public static class ExecuteCoverage extends Coverage {
+		VirtualMachine vm;
+		
+		public ExecuteCoverage() {
+			super(CoverageMode.EXECUTE, 1, 1, false);
+		}
+	}
 	
 	/**
 	 * Creates a Remopla model.
@@ -195,49 +295,209 @@ public class Remopla {
 		return LabelUtils.trimOffset(names[names.length - 1]);
 	}
 	
-	/**
-	 * Performs sequential coverage analysis for this Remopla code.
-	 * 
-	 * @param bddpackage the BDD package.
-	 * @param nodenum the number of BDD nodes to initialize.
-	 * @param cachesize the size of caches for the BDD library.
-	 * @param monitor the progress monitor.
-	 * @return the saturated finite automaton.
-	 */
-	public Fa coverage(String bddpackage, int nodenum, int cachesize, ProgressMonitor monitor) {
+	public static Set<String> firstpoststar(Pds pds, String init) {
+		info("Total: %d labels%n", pds.getStackSymbols().size());
+		Fa fa = new Fa();
+		fa.add(new NullSemiring(), Remopla.p, init, Remopla.s);
+		PdsSat sat = new PdsSat(pds);
+		Fa post = (Fa) sat.poststar(fa);
+		Set<String> labels = post.getLabels();
+		info("After first post*: %d labels%n", labels.size());
+		return labels;
+	}
+	
+	public void coverage(Coverage coverage, ProgressMonitor monitor) {
+		this.coverage = coverage;
+		info("%s%n", coverage.toString());
 		
-		vm = null;
+		switch(coverage.mode) {
+		case EXECUTE:
+			execute(monitor);
+			return;
+		case EXPLICIT:	
+			explicit(monitor);
+			return;
+		case BDDDOMAIN:
+			bdddomain(monitor);
+			return;
+		}
+		throw new RemoplaError("Unexpected coverage mode: %s", coverage.mode);
+	}
+	
+	/**
+	 * Creates a virtual machine and executes this Remopla.
+	 * 
+	 * @param monitor
+	 */
+	private void execute(ProgressMonitor monitor) {
+		ExecuteCoverage c = (ExecuteCoverage) coverage;
+		c.vm = new VirtualMachine(this);
+		c.vm.run(monitor);
+	}
+	
+	private void explicit(ProgressMonitor monitor) {
+		ExplicitCoverage c = (ExplicitCoverage) coverage;
 		
 		// First post*
 		Pds pds = getPds();
-		fa = new Fa();
-		fa.add(new NullSemiring(), p, init, s);
-		sat = new PdsSat(pds);
-		post = (Fa) sat.poststar(fa);
-		Set<String> labels = post.getLabels();
-//		for (String label : labels)
-//			log("%s%n", label);
+		Set<String> labels = firstpoststar(pds, init);
 		
-		// Creates variable manager
-		manager = new VarManager(bddpackage, nodenum, cachesize, 
-				bits, heapSizes, globals, smax, lvmax, 1, false);
-		log("manager:%n%s%n", manager.toString());
-		
+		// Initializes listener
 		listener.setProgressMonitor(monitor);
 		listener.beginTask(getLastCalledName(), labels);
 		monitor.subTask("Analyzing ...");
 		
-		fa = new Fa();
-		fa.add(new BDDSemiring(manager, manager.initVars()), p, init, s);
+		// Initializes FA
+		Fa fa = new Fa();
+		ExplicitRelation rel = ExplicitRelation.init(bits, globals, lvmax, smax, 1, false);
+		fa.add(new ExplicitSemiring(rel), p, init, s);
 		
 		// Second post*
-		sat = new PdsSat(pds);
-		sat.setListener(listener);
-		post = (Fa) sat.poststar(fa, monitor);
+		if (c.nthread <= 1) {
+			Sat sat = new PdsSat(pds);
+			sat.setListener(listener);
+			c.post = (Fa) sat.poststar(fa, monitor);
+		} else {
+			listener.done();
+			throw new RemoplaError("Multithreading for explicit relations not implemented.");
+		}
 		
 		listener.done();
-		return post;
 	}
+	
+	private void bdddomain(ProgressMonitor monitor) {
+		BDDDomainCoverage c = (BDDDomainCoverage) coverage;
+		
+		// First post*
+		Pds pds = getPds();
+		Set<String> labels = firstpoststar(pds, init);
+		
+		// Creates variable manager
+		c.manager = new VarManager(c.bddpackage, c.nodenum, c.cachesize, 
+				bits, heapSizes, globals, smax, lvmax, 1, false);
+		log("manager:%n%s%n", c.manager.toString());
+		
+		// Initializes listener
+		listener.setProgressMonitor(monitor);
+		listener.beginTask(getLastCalledName(), labels);
+		monitor.subTask("Analyzing ...");
+		
+		// Initializes FA
+		c.fa = new Fa();
+		c.fa.add(new BDDSemiring(c.manager, c.manager.initVars()), p, init, s);
+		
+		// Second post*
+		Sat sat;
+		if (c.nthread <= 1) {
+			sat = new PdsSat(pds);
+			sat.setListener(listener);
+			c.post = (Fa) sat.poststar(c.fa, monitor);
+		} else {
+			Dpn dpn = getDpn();
+			info("DPN contains %d rules%n", dpn.size());
+			Semiring g0 = (c.lazy) ? null : new BDDSemiring(c.manager, c.manager.initSharedVars());
+			sat = new DpnSat(dpn, g0, c.nthread, c.ncontext, c.lazy);
+			sat.setListener(listener);
+			c.reach = (DpnReach) sat.poststar(c.fa, monitor);
+		}
+		
+		listener.done();
+	}
+	
+//	/**
+//	 * Performs sequential coverage analysis for this Remopla code.
+//	 * 
+//	 * @param bddpackage the BDD package.
+//	 * @param nodenum the number of BDD nodes to initialize.
+//	 * @param cachesize the size of caches for the BDD library.
+//	 * @param monitor the progress monitor.
+//	 * @return the saturated finite automaton.
+//	 */
+//	public Fa coverage(String bddpackage, int nodenum, int cachesize, ProgressMonitor monitor) {
+//		
+//		vm = null;
+//		
+//		// First post*
+//		Pds pds = getPds();
+//		Set<String> labels = firstpoststar(pds, init);
+//		
+////		fa = new Fa();
+////		fa.add(new NullSemiring(), p, init, s);
+////		sat = new PdsSat(pds);
+////		post = (Fa) sat.poststar(fa);
+////		Set<String> labels = post.getLabels();
+//		
+//		// Creates variable manager
+////		manager = new VarManager(bddpackage, nodenum, cachesize, 
+////				bits, heapSizes, globals, smax, lvmax, 1, false);
+////		log("manager:%n%s%n", manager.toString());
+//		
+//		listener.setProgressMonitor(monitor);
+//		listener.beginTask(getLastCalledName(), labels);
+//		monitor.subTask("Analyzing ...");
+//		
+//		fa = new Fa();
+////		fa.add(new BDDSemiring(manager, manager.initVars()), p, init, s);
+//		fa.add(new ExplicitSemiring(ExplicitRelation.init(bits, globals, lvmax, smax, 1, false)), p, init, s);
+//		
+//		// Second post*
+//		sat = new PdsSat(pds);
+//		sat.setListener(listener);
+//		post = (Fa) sat.poststar(fa, monitor);
+//		
+//		listener.done();
+//		return post;
+//	}
+	
+//	/**
+//	 * Performs multithreaded coverage analysis for this Remopla code.
+//	 * 
+//	 * @param bddpackage the BDD package.
+//	 * @param nodenum the number of BDD nodes to initialize.
+//	 * @param cachesize the size of caches for the BDD library.
+//	 * @param n the thread bound.
+//	 * @param k the context bound.
+//	 * @param lazy determines whether to use the lazy splitting technique.
+//	 * @param monitor the progress monitor.
+//	 * @return the saturated finite automaton.
+//	 */
+//	public void coverage(String bddpackage, int nodenum, int cachesize, 
+//			int n, int k, boolean lazy, ProgressMonitor monitor) {
+//		
+//		vm = null;
+//		
+//		// First post*
+//		Pds pds = getPds();
+//		Set<String> labels = firstpoststar(pds, init);
+//		
+////		fa = new Fa();
+////		fa.add(new NullSemiring(), p, init, s);
+////		sat = new PdsSat(pds);
+////		post = (Fa) sat.poststar(fa);
+////		Set<String> labels = post.getLabels();
+//		
+//		// Creates variable manager
+//		manager = new VarManager(bddpackage, nodenum, cachesize, 
+//				bits, heapSizes, globals, smax, lvmax, n, lazy);
+//		log("manager:%n%s%n", manager.toString());
+//		
+//		Dpn dpn = getDpn();
+//		info("DPN contains %d rules%n", dpn.size());
+//		listener.setProgressMonitor(monitor);
+//		listener.beginTask(getLastCalledName(), labels);
+//		monitor.subTask("Analyzing ...");
+//		
+//		fa = new Fa();
+//		fa.add(new BDDSemiring(manager, manager.initVars()), p, init, s);
+//		
+//		// Second post*
+//		Semiring g0 = (lazy) ? null : new BDDSemiring(manager, manager.initSharedVars());
+//		sat = new DpnSat(dpn, g0, n, k, lazy);
+//		sat.setListener(listener);
+//		reach = (DpnReach) sat.poststar(fa, monitor);
+//		
+//		listener.done();
+//	}
 	
 	/**
 	 * Returns <code>true</code> if {@link #coverage(ProgressMonitor)}
@@ -246,15 +506,16 @@ public class Remopla {
 	 * @return <code>true</code> if a label with assertion error is reachable.
 	 */
 	public boolean hasAssertionError() {
+		if (!coverage.mode.bdd())
+			return false;
 		
-		if (post == null) return false;
-		
+		BDDCoverage c = (BDDCoverage) coverage;
 		Set<String> labels = getLabels();
 		for (String label : labels) {
 			if (!(LabelUtils.isAssertionName(label)))
 				continue;
 			
-			if (post.reachable(label)) {
+			if (c.post.reachable(label)) {
 				log("AssertionError found: %s%n", label);
 				return true;
 			}
@@ -263,73 +524,15 @@ public class Remopla {
 		return false;
 	}
 	
-	/**
-	 * Performs multithreaded coverage analysis for this Remopla code.
-	 * 
-	 * @param bddpackage the BDD package.
-	 * @param nodenum the number of BDD nodes to initialize.
-	 * @param cachesize the size of caches for the BDD library.
-	 * @param n the thread bound.
-	 * @param k the context bound.
-	 * @param lazy determines whether to use the lazy splitting technique.
-	 * @param monitor the progress monitor.
-	 * @return the saturated finite automaton.
-	 */
-	public void coverage(String bddpackage, int nodenum, int cachesize, 
-			int n, int k, boolean lazy, ProgressMonitor monitor) {
-		
-		vm = null;
-		
-		// First post*
-		Pds pds = getPds();
-		info("Total: %d labels%n", pds.getStackSymbols().size());
-		fa = new Fa();
-		fa.add(new NullSemiring(), p, init, s);
-		sat = new PdsSat(pds);
-		post = (Fa) sat.poststar(fa);
-		Set<String> labels = post.getLabels();
-		
-		// Creates variable manager
-		manager = new VarManager(bddpackage, nodenum, cachesize, 
-				bits, heapSizes, globals, smax, lvmax, n, lazy);
-		log("manager:%n%s%n", manager.toString());
-		
-		Dpn dpn = getDpn();
-		info("DPN contains %d rules%n", dpn.size());
-		listener.setProgressMonitor(monitor);
-		listener.beginTask(getLastCalledName(), labels/*dpn.getStackSymbols()*/);
-		monitor.subTask("Analyzing ...");
-		
-		fa = new Fa();
-		fa.add(new BDDSemiring(manager, manager.initVars()), p, init, s);
-		
-		// Second post*
-		Semiring g0 = (lazy) ? null : new BDDSemiring(manager, manager.initSharedVars());
-		sat = new DpnSat(dpn, g0, n, k, lazy);
-		sat.setListener(listener);
-		reach = (DpnReach) sat.poststar(fa, monitor);
-		
-		listener.done();
-	}
-	
 	public boolean reachable(String a, String b) {
+		if (coverage.nthread <= 1 || !coverage.mode.bdd())
+			return false;
 		
+		BDDCoverage c = (BDDCoverage) coverage;
 		log("reachable(%s, %s)%n", a, b);
-		if (reach == null) return false;
+		if (c.reach == null) return false;
 		
-		return reach.reachable(a, b);
-	}
-	
-	/**
-	 * Creates a virtual machine and executes this Remopla.
-	 * 
-	 * @param monitor
-	 */
-	public void run(ProgressMonitor monitor) {
-		
-		post = null;
-		vm = new VirtualMachine(this);
-		vm.run(monitor);
+		return c.reach.reachable(a, b);
 	}
 	
 	/**
@@ -409,38 +612,59 @@ public class Remopla {
 	}
 	
 	public List<Float> getFloats() {
-		if (manager == null) return null;
-		return manager.getFloats();
+		if (!coverage.mode.equals(CoverageMode.BDDDOMAIN)) 
+			return null;
+		
+		BDDDomainCoverage c = (BDDDomainCoverage) coverage;
+		if (c.manager == null) 
+			return null;
+		
+		return c.manager.getFloats();
 	}
 	
 	public VarManager getVarManager() {
-		return manager;
+		if (!coverage.mode.equals(CoverageMode.BDDDOMAIN)) 
+			return null;
+		
+		BDDDomainCoverage c = (BDDDomainCoverage) coverage;
+		return c.manager;
 	}
 	
-	public List<RawArgument> getRawArguments(String label) {
-		
-		if (post != null) {
-		
-			Set<Transition> trans = post.getTransitions(p, label);
-			List<RawArgument> raws = new ArrayList<RawArgument>();
-			for (Transition t : trans)
-				raws.addAll(manager.getRawArguments(((BDDSemiring) post.getWeight(t)).bdd));
-			
-			return raws;
-		} else if (vm != null) {
-			
-			return vm.getRawArguments(label);
+//	public List<RawArgument> getRawArguments(String label) {
+//		
+//		if (post != null) {
+//		
+//			Set<Transition> trans = post.getTransitions(p, label);
+//			List<RawArgument> raws = new ArrayList<RawArgument>();
+//			for (Transition t : trans)
+//				raws.addAll(manager.getRawArguments(((BDDSemiring) post.getWeight(t)).bdd));
+//			
+//			return raws;
+//		} else if (vm != null) {
+//			
+//			return vm.getRawArguments(label);
+//		}
+//		
+//		return null;
+//	}
+	
+	public Collection<RawArgument> getRawArguments(String label) {
+		switch(coverage.mode) {
+		case EXECUTE:
+			return ((ExecuteCoverage) coverage).vm.getRawArguments(label);
+		case EXPLICIT:
+			return getRawArguments(label, (ExplicitCoverage) coverage);
+		case BDDDOMAIN:
+			return getRawArguments(label, (BDDDomainCoverage) coverage);
 		}
-		
-		return null;
+		throw new RemoplaError("Unexpected coverage mode: %s", coverage.mode);
 	}
 	
-	public List<RawArgument> getRawArguments2(String label) {
-		
-		if (vm != null) return vm.getRawArguments(label);
-		
+	private static List<RawArgument> getRawArguments(String label, BDDDomainCoverage coverage) {
+		Fa post = coverage.post;
 		if (post == null) return null;
 		
+		VarManager manager = coverage.manager;
 		Set<Transition> trans = post.getTransitions(p, label);
 		WorkSet<String> workset = new LifoWorkSet<String>();
 		HashMap<String, BDD> rels = new HashMap<String, BDD>();
@@ -521,31 +745,92 @@ public class Remopla {
 		return raws;
 	}
 	
+	public Collection<RawArgument> getRawArguments(String label, ExplicitCoverage coverage) {
+		Fa post = coverage.post;
+		if (post == null) return null;
+		
+		Set<Transition> trans = post.getTransitions(p, label);
+		WorkSet<String> workset = new LifoWorkSet<String>();
+		HashMap<String, ExplicitSemiring> rels = new HashMap<String, ExplicitSemiring>();
+		for (Transition t : trans) {
+			workset.add(t.getToState());
+			rels.put(t.getToState(), (ExplicitSemiring) post.getWeight(t).id());
+		}
+		
+		// States that has transitions to the final state.
+		HashSet<String> toS = new HashSet<String>();
+		
+		while (!workset.isEmpty()) {
+			
+			// Removes q from workset
+			String q = workset.remove();
+			
+			// Continues if there is no transitions leaving q
+			trans = post.getTransitions(q);
+			if (trans == null) continue;
+			
+			// For all transitions leaving q
+			for (Transition t : trans) {
+				
+				log("t: %s%n", t);
+				String q_t = t.getToState();
+				if (q_t.equals(s)) {
+					toS.add(q);
+					continue;
+				}
+				
+				ExplicitSemiring rels1 = rels.get(q);
+				ExplicitSemiring rels2 = (ExplicitSemiring) post.getWeight(t);
+				ExplicitSemiring r = rels1.conjoin(rels2);
+				log("rels1: %s%n", rels1.toString());
+				log("rels2: %s%n", rels2.toString());
+				log("r: %s%n", r.toString());
+				
+				/*
+				 * If the bdd is new, puts the state 
+				 * and the corresponding bdd into the workset.
+				 */
+				if (!rels.containsKey(q_t)) {
+					workset.add(q_t);
+					rels.put(q_t, r);
+					continue;
+				}
+				
+				// Ignores if the new bdd equals the existing bdd
+				ExplicitSemiring r_t = rels.get(q_t);
+				if (r.equals(r_t)) {
+					continue;
+				}
+				
+				// Disjuncts the new bdd with the existing bdd
+				r = (ExplicitSemiring) r_t.id().orWith( r);
+				
+				// Ignores if the new bdd equals the existing bdd
+				if (r.equals(r_t)) {
+					continue;
+				}
+				
+				// Puts the state and the corresponding bdd into the workset
+				workset.add(q_t);
+				rels.put(q_t, r);
+			}
+		}
+		
+		Set<RawArgument> raws = new HashSet<RawArgument>();
+		for (String q : toS) {
+//			System.out.println(rels.get(q).toString());
+			raws.addAll(rels.get(q).getRawArguments());
+		}
+		
+		return raws;
+	}
+	
 	/**
 	 * Frees all analysis results.
 	 */
 	public void free() {
-				
 		modules = null;
-		
-		if (fa != null) {
-			log("Freeing fa ...");
-			fa.free();
-			fa = null;
-			log("done%n");
-		}
-		
-		if (post != null) {
-			log("Freeing post");
-			post.free();
-			post = null;
-		}
-		reach = null;
-		if (manager != null) {
-			log("Freeing manager");
-			manager.free();
-			manager = null;
-		}
+		coverage.free();
 	}
 	
 	/**

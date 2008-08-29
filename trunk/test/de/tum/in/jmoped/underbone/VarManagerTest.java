@@ -69,14 +69,25 @@ public class VarManagerTest {
 		BDDDomain dom = manager.getHeapDomain(1);
 		Assert.assertEquals(4, dom.size().longValue());
 		
-		BDD a = dom.ithVar(2);
+		BDD a = dom.ithVar(1);
 		Assert.assertEquals(4, dom.size().longValue());
-		Assert.assertEquals(2, a.scanVar(dom).intValue());
+		Assert.assertEquals(1, a.scanVar(dom).intValue());
+		System.out.println(a);
+		System.out.println(dom.set());
+//		BDDIterator itr = a.iterator(dom.set());
+//		while (itr.hasNext()) {
+//			BDD b = itr.nextBDD();
+//			count++;
+//		}
 		
-		BDD b = dom.ithVar(6);
-		Assert.assertEquals(12, dom.size().longValue());
-		Assert.assertEquals(2, a.scanVar(dom).intValue());
-		Assert.assertEquals(6, b.scanVar(dom).intValue());
+//		manager.extendCapacity(dom, 6);
+		BDD b = dom.ithVar(3);
+		System.out.println(a);
+		System.out.println(dom.set());
+		System.out.println(b);
+		Assert.assertEquals(4, dom.size().longValue());
+		Assert.assertEquals(1, a.scanVar(dom).intValue());
+		Assert.assertEquals(3, b.scanVar(dom).intValue());
 	}
 	
 	@Test public void testBDDEquals() {
@@ -110,5 +121,19 @@ public class VarManagerTest {
 			Assert.assertEquals(-1, a);
 			Assert.assertEquals(-1, b);
 		}
+	}
+	
+	@Test public void testToString() {
+		VarManager manager = new VarManager("cudd", 10000, 10000, 
+				4, new long[] { 4, 4, 4 }, null, 1, 1, 1, false);
+		BDD init = manager.initVars();
+		System.out.println(init);
+		System.out.println(init.toStringWithDomains());
+		System.out.println(manager.toString(init));
+	}
+	
+	@Test public void testLoad() {
+		VarManager manager = new VarManager("cudd", 10000, 10000, 
+				4, new long[] { 4, 4, 4 }, null, 1, 1, 1, false);
 	}
 }

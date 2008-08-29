@@ -13,9 +13,11 @@ import java.util.logging.Logger;
 
 import de.tum.in.jmoped.underbone.expr.Arith;
 import de.tum.in.jmoped.underbone.expr.If;
+import de.tum.in.jmoped.underbone.expr.Value;
 import de.tum.in.wpds.Utils;
 
 import net.sf.javabdd.BDD;
+import net.sf.javabdd.BDDDomain;
 import net.sf.javabdd.BDDDomain;
 import net.sf.javabdd.BDDFactory;
 import net.sf.javabdd.BDDPairing;
@@ -31,38 +33,30 @@ import net.sf.javabdd.BDD.BDDIterator;
 public class VarManager {
 
 	// Integer bits
-	private int bits;
+	protected int bits;
 	
-	// 2^bits
-	private long size;
+	protected int smax;
 	
-	// 2^(bits-1) - 1
-	private int maxint;
+	protected int lvmax;
+	
+	protected int tbound;
+	
+	protected boolean lazy;
 	
 	// Heap size
 	private long[] heapSizes;
 	
-	int smax;
-	
-	int lvmax;
-	
-	private int tbound;
-	
-	private boolean lazy;
-	
-	private static final int varcopy = 3;
-	
-	int globalcopy;
-	
-	/**
-	 * Maps names to global variables
-	 */
-	private HashMap<String, Variable> globals;
-	
-//	private HashSet<Integer> sharedDomIndex;
-	
 	// Domains of all variables
-	BDDDomain[] doms;
+	protected BDDDomain[] doms;
+	
+	// Stack pointer domain index
+	protected int spDomIndex;
+	
+	// Stack domain index
+	protected int sDomIndex;
+	
+	// Local variable domain index
+	protected int lvDomIndex;
 	
 	// Return variable domain index
 	private int retDomIndex;
@@ -73,21 +67,12 @@ public class VarManager {
 	// Heap domain index
 	private int hDomIndex;
 	
-	// Stack pointer domain index
-	private int spDomIndex;
-	
-	// Stack domain index
-	private int sDomIndex;
-	
-	// Local variable domain index
-	private int lvDomIndex;
-	
 	/**
 	 * Number of globals: global vars + heap pointer + heap
 	 */
 	int gnum;
 	
-	/*
+	/**
 	 *  Starting domain index of globals.
 	 */
 	private static final int g0 = 0;
@@ -95,10 +80,19 @@ public class VarManager {
 	// Starting domain index of locals
 	int l0;
 	
+	protected static final int varcopy = 3;
+	
+	int globalcopy;
+	
+	/**
+	 * Maps names to global variables
+	 */
+	protected HashMap<String, Variable> globals;
+	
 	// BDDFactory
 	BDDFactory factory;
 	
-	private int[] gindex;
+	protected int[] gindex;
 	
 	/** 
 	 * Maps a domain index of a variable to a variable set 
@@ -125,8 +119,9 @@ public class VarManager {
 	/**
 	 * Records the maximum number of BDD nodes. For statistics purpose.
 	 */
-	private static int maxNodeNum;
+	protected static int maxNodeNum;
 	
+
 	/**
 	 * Constructs a variable manager.
 	 * 
@@ -150,8 +145,7 @@ public class VarManager {
 			log("bits: %d, heapSizes: %s, g: %s, smax: %s, lvmax: %d, tbound %d%n",
 					bits, Arrays.toString(heapSizes), g, smax, lvmax, tbound);
 		this.bits = bits;
-		this.size = 1 << bits;
-		this.maxint = (int) size/2 - 1;
+		long size = 1 << bits;
 		this.heapSizes = heapSizes;
 		this.smax = smax;
 		this.lvmax = lvmax;
@@ -176,12 +170,9 @@ public class VarManager {
 		s++;	// ret var
 		long[] domSize = new long[s];
 		
-//		if (multithreading())
-//			sharedDomIndex = new HashSet<Integer>((int) (1.5*tbound*heapLength));
 		
 		// Global variables
 		int index = 0;
-//		g0 = index;
 		if (g != null && !g.isEmpty()) {
 			
 			globals = new HashMap<String, Variable>((int) (1.4 * g.size()));
@@ -189,9 +180,6 @@ public class VarManager {
 				
 				v.setIndex(index);
 				if (log()) log("%s (%d)%n", v.name, v.getIndex());
-//				if (multithreading() && v.isShared()) {
-//					sharedDomIndex.add(index);
-//				}
 				long gsize = (long) Math.pow(2, v.getBits(bits));
 				for (int i = 0; i < globalcopy; i++)
 					domSize[index++] = gsize;
@@ -206,9 +194,6 @@ public class VarManager {
 			// Heap pointer
 			hpDomIndex = index;
 			if (log()) log("heap pointer (%d)%n", index);
-//			if (multithreading()) {
-//				sharedDomIndex.add(index);
-//			}
 			for (int i = 0; i < globalcopy; i++)
 				domSize[index++] = size;
 			gnum++;
@@ -216,9 +201,6 @@ public class VarManager {
 			// Heap: at zero
 			hDomIndex = index;
 			if (log()) log("heap[0] (%d)%n", index);
-//			if (multithreading()) {
-//				sharedDomIndex.add(index);
-//			}
 			for (int j = 0; j < globalcopy; j++)
 				domSize[index++] = 2;
 			gnum++;
@@ -227,9 +209,6 @@ public class VarManager {
 			for (int i = 1; i < heapLength; i++) {
 				
 				if (log()) log("heap[%d] - index: %d, size: %d%n", i, index, heapSizes[i]);
-//				if (multithreading()) {
-//					sharedDomIndex.add(index);
-//				}
 				for (int j = 0; j < globalcopy; j++)
 					domSize[index++] = heapSizes[i];
 				gnum++;
@@ -280,37 +259,18 @@ public class VarManager {
 		factory = BDDFactory.init(bddpackage, nodenum, cachesize);
 		doms = factory.extDomain(domSize);
 		
+		
+		if (log()) {
+			log("%n");
+			for (int i = 0; i < doms.length; i++)
+				log("doms[%d]:%s%n", i, Arrays.toString(doms[i].vars()));
+		}
 		info("BDD package: %s%n", factory.getClass().getName());
 	}
 	
 	public int getHeapSize() {
 		if (heapSizes == null) return 0;
 		return heapSizes.length;
-	}
-	
-	public int getMaxLocalVars() {
-		return lvmax;
-	}
-	
-	public boolean multithreading() {
-		return tbound > 1;
-	}
-	
-	public int getThreadBound() {
-		return tbound;
-	}
-	
-	public boolean lazy() {
-		return lazy;
-	}
-	
-	void updateMaxNodeNum() {
-		int num = factory.getNodeNum();
-		if (num > maxNodeNum) maxNodeNum = num;
-	}
-	
-	public static int getMaxNodeNum() {
-		return maxNodeNum;
 	}
 	
 	/**
@@ -358,24 +318,7 @@ public class VarManager {
 			if (index == hpDomIndex) a.andWith(doms[index].ithVar(1));
 			else a.andWith(doms[index].ithVar(0));
 		}
-//		for (Integer i : sharedDomIndex) {
-//			if (i == hpDomIndex) a.andWith(doms[i].ithVar(1));
-//			else a.andWith(doms[i].ithVar(0));
-//		}
-		
 		return a;
-	}
-	
-	public Integer getConstant(String name) {
-		if (constants == null)	// Shouldn't be possible, a precaution.
-			constants = new HashMap<String, Integer>();
-		return constants.get(name);
-	}
-	
-	public void putConstant(String name, Integer value) {
-		if (constants == null)
-			constants = new HashMap<String, Integer>();
-		constants.put(name, value);
 	}
 	
 	/**
@@ -392,18 +335,51 @@ public class VarManager {
 		return a;
 	}
 	
-//	/**
-//	 * Abstracts global variables (G0) from BDD a.
-//	 * 
-//	 * @param a the BDD
-//	 * @return the abstracted BDD
-//	 */
-//	public BDD abstractGlobals(BDD a) {
-//		
-//		BDDVarSet gvs = getGlobalVarSet();
-//		return a.exist(gvs);
-//	}
+	public BDDDomain[] getDomains() {
+		return doms;
+	}
 	
+	public BDDDomain getDomain(int index) {
+		return doms[index];
+	}
+	
+	public int getMaxLocalVars() {
+		return lvmax;
+	}
+	
+	public boolean multithreading() {
+		return tbound > 1;
+	}
+	
+	public int getThreadBound() {
+		return tbound;
+	}
+	
+	public boolean lazy() {
+		return lazy;
+	}
+	
+	void updateMaxNodeNum() {
+		int num = factory.getNodeNum();
+		if (num > maxNodeNum) maxNodeNum = num;
+	}
+	
+	public static int getMaxNodeNum() {
+		return maxNodeNum;
+	}
+		
+	public Integer getConstant(String name) {
+		if (constants == null)	// Shouldn't be possible, a precaution.
+			constants = new HashMap<String, Integer>();
+		return constants.get(name);
+	}
+	
+	public void putConstant(String name, Integer value) {
+		if (constants == null)
+			constants = new HashMap<String, Integer>();
+		constants.put(name, value);
+	}
+		
 	/**
 	 * Abstracts local variables from BDD a.
 	 * 
@@ -442,7 +418,7 @@ public class VarManager {
 	}
 	
 	public int getMaxInt() {
-		return maxint;
+		return (1 << (bits - 1)) - 1;
 	}
 	
 	/**
@@ -451,18 +427,7 @@ public class VarManager {
 	 * @return 2^bits.
 	 */
 	public long size() {
-		
-		return size;
-	}
-	
-	public BDDDomain[] getDomains() {
-		
-		return doms;
-	}
-	
-	public BDDDomain getDomain(int index) {
-		
-		return doms[index];
+		return 1 << bits;
 	}
 	
 	/**
@@ -474,54 +439,24 @@ public class VarManager {
 		return factory;
 	}
 	
-	public BDDVarSet getVarSetWithout(int index) {
-		
-		if (varSetWithout == null) 
-			varSetWithout = new HashMap<Integer, BDDVarSet>();
-		
-		BDDVarSet varset = varSetWithout.get(index);
-		if (varset != null) return varset;
-		
-		BDDDomain[] d = new BDDDomain[factory.numberOfDomains() - 1];
-		for (int i = 0, j = 0; i < factory.numberOfDomains(); i++) {
-			if (i != index) {
-				d[j++] = factory.getDomain(i);
-			}
-				
-		}
-		varset = factory.makeSet(d);
-		varSetWithout.put(index, varset);
-		
-		return varset;
+	/*************************************************************************
+	 * Methods for domains
+	 *************************************************************************/
+	
+	public BDDDomain getStackPointerDomain() {
+		if (spDomIndex == -1) return null;
+		return doms[spDomIndex];
 	}
 	
 	/**
-	 * Gets all BDD variable set without those having indices 
-	 * specified by <code>indices</code>.
+	 * Gets the <code>BDDDomain</code> of the stack element at <code>index</code>.
 	 * 
-	 * @param indices the indices.
-	 * @return the variable set.
+	 * @param index the stack element index.
+	 * @return the <code>BDDDomain</code> of the stack element.
 	 */
-	public BDDVarSet getVarSetWithout(Set<Integer> indices) {
-		
-		BDDDomain[] d = new BDDDomain[factory.numberOfDomains() - indices.size()];
-		for (int i = 0, j = 0; i < factory.numberOfDomains(); i++) {
-			if (indices.contains(i)) continue;
-			d[j++] = factory.getDomain(i);
-		}
-		return factory.makeSet(d);
-	}
-	
-	/**
-	 * Returns the variable having the specified name.
-	 * 
-	 * @param name the name of the variable.
-	 * @return the variable.
-	 */
-	public Variable getGlobalVar(String name) {
-		
-		if (globals == null) return null;
-		return globals.get(name);
+	public BDDDomain getStackDomain(int index) {
+		if (sDomIndex == -1) return null;
+		return doms[sDomIndex + index];
 	}
 	
 	/**
@@ -538,8 +473,8 @@ public class VarManager {
 	}
 	
 	public BDDDomain getRetVarDomain() {
-		
-		if (retDomIndex == -1) return null;	// TODO this never happen because we always add ret var
+		// This never happen because we always add ret var
+		if (retDomIndex == -1) return null; 
 		return doms[retDomIndex];
 	}
 	
@@ -623,32 +558,71 @@ public class VarManager {
 		return getHeapDomain(ptr + 2);
 	}
 	
-	public BDDDomain getStackPointerDomain() {
-		
-		if (spDomIndex == -1) return null;
-		return doms[spDomIndex];
-	}
-	
-	/**
-	 * Gets the <code>BDDDomain</code> of the stack element at <code>index</code>.
-	 * 
-	 * @param index the stack element index.
-	 * @return the <code>BDDDomain</code> of the stack element.
-	 */
-	public BDDDomain getStackDomain(int index) {
-		if (sDomIndex == -1) return null;
-		return doms[sDomIndex + index];
-	}
-	
 	/**
 	 * Gets the <code>BDDDomain</code> of the local variable at <code>index</code>.
 	 * 
-	 * @param index the stack element index.
+	 * @param index the local variable index.
 	 * @return the <code>BDDDomain</code> of the local variable.
 	 */
 	public BDDDomain getLocalVarDomain(int index) {
 		if (lvDomIndex == -1) return null;
+		if (index >= lvmax) return null;
 		return doms[lvDomIndex + varcopy*index];
+	}
+	
+	public BDDVarSet getVarSetWithout(int index) {
+		
+		if (varSetWithout == null) 
+			varSetWithout = new HashMap<Integer, BDDVarSet>();
+		
+		// Uses cache
+		if (varSetWithout.containsKey(index))
+			return varSetWithout.get(index);
+		
+		BDDDomain[] d = new BDDDomain[doms.length - 1];
+		for (int i = 0, j = 0; i < doms.length; i++) {
+			if (i != index) {
+				d[j++] = doms[i];
+			}
+				
+		}
+		BDDVarSet varset = factory.makeSet(d);
+		
+		// Caches
+		varSetWithout.put(index, varset);
+		
+		return varset;
+	}
+	
+	/**
+	 * Gets all BDD variable set without those having indices 
+	 * specified by <code>indices</code>.
+	 * 
+	 * @param indices the indices.
+	 * @return the variable set.
+	 */
+	public BDDVarSet getVarSetWithout(Set<Integer> indices) {
+		
+		BDDDomain[] d = new BDDDomain[doms.length - indices.size()];
+		for (int i = 0, j = 0; i < doms.length; i++) {
+			if (indices.contains(i)) continue;
+			d[j++] = doms[i];
+		}
+		BDDVarSet varset = factory.makeSet(d);
+		
+		return varset;
+	}
+	
+	/**
+	 * Returns the variable having the specified name.
+	 * 
+	 * @param name the name of the variable.
+	 * @return the variable.
+	 */
+	public Variable getGlobalVar(String name) {
+		
+		if (globals == null) return null;
+		return globals.get(name);
 	}
 	
 	/**
@@ -719,45 +693,100 @@ public class VarManager {
 	 * @param dom2 the BDD domain 2
 	 * @return the equality BDD
 	 */
-	public BDD bddEquals(BDDDomain dom1, BDDDomain dom2) {
+	public BDD bddEquals(BDDDomain dom1, BDDDomain dom2/*, boolean signed*/) {
 		
-		BigInteger size1 = dom1.size();
-		BigInteger size2 = dom2.size();
+//		BigInteger size1 = dom1.usize();
+//		BigInteger size2 = dom2.usize();
+		
+//		if (size1.compareTo(size2) < 0) {
+//			if (log())
+//				BDDSemiring.log("\t\t(dom1:%d size1:%s).extendCapacity(%d)%n", dom1.getIndex(), size1, size2);
+//			dom1.extendCapacity(size2.divide(BigInteger.valueOf(2)).subtract(BigInteger.ONE));
+//		} else if (size1.compareTo(size2) > 0) {
+//			if (log())
+//				BDDSemiring.log("\t\t(dom2:%d size2:%s).extendCapacity(%d)%n", dom2.getIndex(), size2, size1);
+//			dom2.extendCapacity(size1.divide(BigInteger.valueOf(2)).subtract(BigInteger.ONE));
+//		}
+//		
+//		return dom1.buildEquals(dom2);
 		
 		// Uses the library function if the domains have the same size
-		if (size1.equals(size2))
+		int[] lessvars = dom1.vars();
+		int[] morevars = dom2.vars();
+		
+		if (lessvars.length == morevars.length)
 			return dom1.buildEquals(dom2);
 		
-		BDDDomain less, more;
-		if (size1.compareTo(size2) < 0) {
-			less = dom1;
-			more = dom2;
-		} else {
-			less = dom2;
-			more = dom1;
+		if (lessvars.length > morevars.length) {
+			int[] tmp = lessvars;
+			lessvars = morevars;
+			morevars = tmp;
 		}
-		int[] lessvars = less.vars();
-		int[] morevars = more.vars();
+//		int[] lessvars = less.vars();
+//		int[] morevars = more.vars();
+		
+		
+		if (lessvars.length == 1) {
+			BDD e = factory.one();
+			BDD a = factory.ithVar(lessvars[0]);
+            BDD b = factory.ithVar(morevars[0]);
+            a.biimpWith(b);
+            e.andWith(a);
+            
+            for (int i = 1; i < morevars.length; i++)
+            	e.andWith(factory.nithVar(morevars[i]));
+            log("e:%s%n", e);
+			return e;
+		}
 		
 		BDD a = factory.one();
-		int i;
+		int i, j;
 		for (i = 0; i < lessvars.length - 1; i++) {
 			BDD b = factory.ithVar(lessvars[i]).andWith(factory.ithVar(morevars[i]));
 			b.orWith(factory.nithVar(lessvars[i]).andWith(factory.nithVar(morevars[i])));
 			a.andWith(b);
 		}
 		
-		// Sign-bit extension: zero
-		BDD b = factory.ithVar(lessvars[i]);
-		for (int j = i; j < morevars.length; j++)
-			b.andWith(factory.ithVar(morevars[j]));
-
-		// Sign-bit extension: one
-		BDD c = factory.nithVar(lessvars[i]);
-		for (int j = i; j < morevars.length; j++)
-			c.andWith(factory.nithVar(morevars[j]));
+//		if (signed) {
 		
-		a.andWith(b.orWith(c));
+			// Sign-bit extension: zero
+			BDD b = factory.ithVar(lessvars[i]);
+			for (j = i; j < morevars.length; j++)
+				b.andWith(factory.ithVar(morevars[j]));
+	
+			// Sign-bit extension: one
+			BDD c = factory.nithVar(lessvars[i]);
+			for (j = i; j < morevars.length; j++)
+				c.andWith(factory.nithVar(morevars[j]));
+		
+//		for (i = lessvars.length - 1, j = morevars.length - 1; i >= 1; i--, j--) {
+//			BDD b = factory.ithVar(lessvars[i]).andWith(factory.ithVar(morevars[j]));
+//			b.orWith(factory.nithVar(lessvars[i]).andWith(factory.nithVar(morevars[j])));
+//			a.andWith(b);
+//		}
+//		
+//		// Sign-bit extension: zero
+//		BDD b = factory.ithVar(lessvars[0]);
+//		for (i = j; i >= 0; i--)
+//			b.andWith(factory.ithVar(morevars[i]));
+//
+//		// Sign-bit extension: one
+//		BDD c = factory.nithVar(lessvars[0]);
+//		for (i = j; i >= 0; i--)
+//			c.andWith(factory.nithVar(morevars[i]));
+		
+			a.andWith(b.orWith(c));	
+//		} else {	// unsigned
+//			// i = lessvars.length - 1
+//			BDD b = factory.ithVar(lessvars[i]).andWith(factory.ithVar(morevars[i]));
+//			b.orWith(factory.nithVar(lessvars[i]).andWith(factory.nithVar(morevars[i])));
+//			a.andWith(b);
+//			
+//			for (j = i + 1; j < morevars.length; j++)
+//				a.andWith(factory.nithVar(morevars[j]));
+//		}
+			
+		BDDSemiring.log("a: %s%n", a);
 		return a;
 	}
 	
@@ -838,7 +867,7 @@ public class VarManager {
 		
 		BDD d = factory.one();
 		for (int i = 0; i < nargs; i++) {
-			d.andWith(bddEquals(getStackDomain(s + i), doms[l0 + varcopy*i + 2]));
+			d.andWith(getStackDomain(s + i).buildEquals(doms[l0 + varcopy*i + 2]));
 		}
 		
 		return d;
@@ -911,7 +940,8 @@ public class VarManager {
 		
 		BDD a = factory.zero();
 		for (int i = min; i <= max; i++) {
-			a.orWith(dom.ithVar(encode(i, dom)));
+			long e = encode(i, dom);
+			a.orWith(dom.ithVar(e));
 		}
 		
 		return a;
@@ -929,11 +959,13 @@ public class VarManager {
 	 */
 	public BDD bddRange(BDDDomain dom, float min, Number next, float max) {
 		
-		float step = (next == null) ? (max - min)/(size - 1) : next.floatValue();
+		float step = (next == null) ? (max - min)/(size() - 1) : next.floatValue();
 		
 		BDD a = factory.zero();
-		for (float i = min; i <= max; i += step)
-			a.orWith(dom.ithVar(encode(i, dom)));
+		for (float i = min; i <= max; i += step) {
+			long v = encode(i, dom);
+			a.orWith(dom.ithVar(v));
+		}
 		
 		return a;
 	}
@@ -1003,62 +1035,62 @@ public class VarManager {
 		return set;
 	}
 	
-	private int nargs;
-	private BDDDomain[] argDoms;
+//	private int nargs;
+//	private BDDDomain[] argDoms;
+//	
+//	public BDD saveArgs(int hp, int nargs) {
+//	
+//		this.nargs = nargs;
+//		if (nargs <= 0) return factory.one();
+//		
+//		long[] domSize = new long[nargs + hp - 1];
+//		int j = 0;
+//		for (int i = 0; i < nargs; i++)
+//			domSize[j++] = size;
+//		for (int i = 1; i < hp; i++)
+//			domSize[j++] = heapSizes[i];
+//		argDoms = factory.extDomain(domSize);
+//		BDD bdd = factory.one();
+//		j = 0;
+//		for (int i = 0; i < nargs; i++)
+//			bdd.andWith(getLocalVarDomain(i).buildEquals(argDoms[j++]));
+//		for (int i = 1; i < hp; i++)
+//			bdd.andWith(getHeapDomain(i).buildEquals(argDoms[j++]));
+//		return bdd;
+//	}
 	
-	public BDD saveArgs(int hp, int nargs) {
-	
-		this.nargs = nargs;
-		if (nargs <= 0) return factory.one();
-		
-		long[] domSize = new long[nargs + hp - 1];
-		int j = 0;
-		for (int i = 0; i < nargs; i++)
-			domSize[j++] = size;
-		for (int i = 1; i < hp; i++)
-			domSize[j++] = heapSizes[i];
-		argDoms = factory.extDomain(domSize);
-		BDD bdd = factory.one();
-		j = 0;
-		for (int i = 0; i < nargs; i++)
-			bdd.andWith(getLocalVarDomain(i).buildEquals(argDoms[j++]));
-		for (int i = 1; i < hp; i++)
-			bdd.andWith(getHeapDomain(i).buildEquals(argDoms[j++]));
-		return bdd;
-	}
-	
-	public List<RawArgument> getRawArguments(BDD a) {
-		
-		// Abstracts everything else
-		BDDVarSet abs = factory.emptySet();
-		for (int i = 0; i < doms.length; i++)
-			abs.unionWith(doms[i].set());
-		BDD b = a.exist(abs);
-		
-		// Gets iterator
-		BDDVarSet vs = factory.emptySet();
-		for (int i = 0; i < argDoms.length; i++)
-			vs.unionWith(argDoms[i].set());
-		BDDIterator itr = b.iterator(vs);
-		
-		// For each possible argument
-		List<RawArgument> args = new ArrayList<RawArgument>();
-		while (itr.hasNext()) {
-			BDD c = itr.nextBDD();
-			RawArgument arg = new RawArgument(nargs, argDoms.length - nargs);
-			for (int i = 0; i < nargs; i++)
-				arg.lv[i] = decode(c.scanVar(argDoms[i]).longValue(), argDoms[i]);
-			for (int i = nargs; i < argDoms.length; i++)
-				arg.heap[i - nargs] = decode(c.scanVar(argDoms[i]).longValue(), argDoms[i]);
-			log("arg: %s%n", arg);
-			args.add(arg);
-			c.free();
-		}
-		
-		vs.free();
-		b.free();
-		return args;
-	}
+//	public List<RawArgument> getRawArguments(BDD a) {
+//		
+//		// Abstracts everything else
+//		BDDVarSet abs = factory.emptySet();
+//		for (int i = 0; i < doms.length; i++)
+//			abs.unionWith(doms[i].set());
+//		BDD b = a.exist(abs);
+//		
+//		// Gets iterator
+//		BDDVarSet vs = factory.emptySet();
+//		for (int i = 0; i < argDoms.length; i++)
+//			vs.unionWith(argDoms[i].set());
+//		BDDIterator itr = b.iterator(vs);
+//		
+//		// For each possible argument
+//		List<RawArgument> args = new ArrayList<RawArgument>();
+//		while (itr.hasNext()) {
+//			BDD c = itr.nextBDD();
+//			RawArgument arg = new RawArgument(nargs, argDoms.length - nargs);
+//			for (int i = 0; i < nargs; i++)
+//				arg.lv[i] = decode(c.scanVar(argDoms[i]).longValue(), argDoms[i]);
+//			for (int i = nargs; i < argDoms.length; i++)
+//				arg.heap[i - nargs] = decode(c.scanVar(argDoms[i]).longValue(), argDoms[i]);
+//			log("arg: %s%n", arg);
+//			args.add(arg);
+//			c.free();
+//		}
+//		
+//		vs.free();
+//		b.free();
+//		return args;
+//	}
 	
 	/**
 	 * Signature of a: (G0,L0,G1,L1)
@@ -1078,6 +1110,7 @@ public class VarManager {
 		
 		// Gets iterator
 		BDDIterator itr = b.iterator(getG1L1VarSet());
+//		BDDIterator itr = b.iterator(factory.makeUSet(getG1L1Domain()));
 		
 		// For each possible argument
 		List<RawArgument> args = new ArrayList<RawArgument>();
@@ -1137,10 +1170,10 @@ public class VarManager {
 	
 	private void freeCache() {
 		if (equals != null) {
-			for (BDD equal : equals) {
-				if (equal == null) continue;
-				equal.free();
-				equal = null;
+			for (int i = 0; i < equals.length; i++) {
+				if (equals[i] == null) continue;
+				equals[i].free();
+				equals[i] = null;
 			}
 		}
 		
@@ -1150,43 +1183,26 @@ public class VarManager {
 		}
 		
 		if (pairings != null) {
-			for (BDDPairing pairing : pairings) {
-				if (pairing == null) continue;
-				pairing = null;
+			for (int i = 0; i < pairings.length; i++) {
+				if (pairings[i] == null) continue;
+				pairings[i] = null;
 			}
 		}
 		
 		if (varsets != null) {
-			for (BDDVarSet varset : varsets) {
-				if (varset == null) continue;
-				varset.free();
-				varset = null;
+			for (int i = 0; i < varsets.length; i++) {
+				if (varsets[i] == null) continue;
+				varsets[i].free();
+				varsets[i] = null;
 			}
 		}
 		
-		for (BDDVarSet varset : varSetWithout.values()) {
-			varset.free();
+		if (varSetWithout != null) {
+			for (BDDVarSet varset : varSetWithout.values()) {
+				varset.free();
+			}
+			varSetWithout.clear();
 		}
-		varSetWithout.clear();
-	}
-	
-	public BDD ithVar(BDDDomain dom, int value) {
-		long max = dom.size().longValue()/2;
-        if (value >= max || value < -max) {
-        	dom.extendCapacity(value);
-        	int index = dom.getIndex();
-        	if (index < l0) {
-            	// Globals
-        		for (int i = 1; i < globalcopy; i++)
-        			doms[i].extendCapacity(value);
-        	} else if (index < spDomIndex) {
-        		// Locals
-        		for (int i = 1; i < varcopy; i++)
-        			doms[i].extendCapacity(value);
-        	}
-        	freeCache();
-        }
-        return dom.ithVar(encode(value, dom));
 	}
 	
 	private ArrayList<String> strings;
@@ -1382,9 +1398,9 @@ public class VarManager {
 	 * @return the negation of v.
 	 */
 	public long neg(long v) {
-		
 		if (v == 0) return 0;
 		
+		int maxint = getMaxInt();
 		return (v <= maxint) ? v + maxint : v - maxint;
 	}
 	
@@ -1400,6 +1416,7 @@ public class VarManager {
 			abs.unionWith(getStackDomain(i).set());
 		}
 		abs.unionWith(getRetVarDomain().set());
+		
 //		if (multithreading() && symbolic())
 //			abs.unionWith(getG3VarSet().id());
 		BDD b = a.exist(abs);
@@ -1412,8 +1429,8 @@ public class VarManager {
 			b.andWith(restrictor);
 		
 		// Creates var set over globals, locals, and stacks
-		int nargs = (argDoms == null) ? 0 : argDoms.length;
-		BDDDomain[] d = new BDDDomain[gnum + lvmax + sp + nargs];
+//		int nargs = (argDoms == null) ? 0 : argDoms.length;
+		BDDDomain[] d = new BDDDomain[gnum + lvmax + sp/* + nargs*/];
 		int j = 0;
 		for (int i = 0; i < gnum; i++)
 			d[j++] = doms[g0 + globalcopy*i];
@@ -1421,8 +1438,8 @@ public class VarManager {
 			d[j++] = doms[l0 + varcopy*i];
 		for (int i = 0; i < sp; i++)
 			d[j++] = getStackDomain(i);
-		for (int i = 0; i < nargs; i++)
-			d[j++] = argDoms[i];
+//		for (int i = 0; i < nargs; i++)
+//			d[j++] = argDoms[i];
 		BDDVarSet vs0 = factory.makeSet(d);
 		
 		// Creates iterator
@@ -1476,13 +1493,13 @@ public class VarManager {
 				state.add(String.format("stack: [%s]", toCommaString(s)));
 			}
 			
-			if (nargs > 0) {
-				ArrayList<Integer> args = new ArrayList<Integer>((int) (1.4*nargs));
-				for (int i = 0; i < nargs; i++) {
-					args.add(b.scanVar(argDoms[i]).intValue());
-				}
-				state.add(String.format("args: [%s]", toCommaString(args)));
-			}
+//			if (nargs > 0) {
+//				ArrayList<Integer> args = new ArrayList<Integer>((int) (1.4*nargs));
+//				for (int i = 0; i < nargs; i++) {
+//					args.add(b.scanVar(argDoms[i]).intValue());
+//				}
+//				state.add(String.format("args: [%s]", toCommaString(args)));
+//			}
 			
 //			System.out.println(toCommaString(state));
 			all.add(toCommaString(state));
@@ -1639,76 +1656,76 @@ public class VarManager {
 		return vs;
 	}
 	
-	BDDVarSet getVarSet0() {
-		
-		if (varsets != null && varsets[VARSET_G0L0] != null)
-			return varsets[VARSET_G0L0];
-		
-		int base = gnum + lvmax;
-		BDDDomain[] d = new BDDDomain[base + ((smax > 0) ? smax + 1 : 0)];
-		int j = 0;
-		for (int i = 0; i < gnum; i++)
-			d[j++] = doms[g0 + globalcopy*i];
-		for (int i = 0; i < lvmax; i++)
-			d[j++] = doms[l0 + VarManager.varcopy*i];
-		if (smax > 0) {
-			d[j++] = getStackPointerDomain();
-			for (int i = 0; i < smax; i++)
-				d[j++] = getStackDomain(i);
-		}
-		
-		return putVarSet(VARSET_G0L0, d);
-	}
+//	BDDVarSet getVarSet0() {
+//		
+//		if (varsets != null && varsets[VARSET_G0L0] != null)
+//			return varsets[VARSET_G0L0];
+//		
+//		int base = gnum + lvmax;
+//		BDDDomain[] d = new BDDDomain[base + ((smax > 0) ? smax + 1 : 0)];
+//		int j = 0;
+//		for (int i = 0; i < gnum; i++)
+//			d[j++] = doms[g0 + globalcopy*i];
+//		for (int i = 0; i < lvmax; i++)
+//			d[j++] = doms[l0 + VarManager.varcopy*i];
+//		if (smax > 0) {
+//			d[j++] = getStackPointerDomain();
+//			for (int i = 0; i < smax; i++)
+//				d[j++] = getStackDomain(i);
+//		}
+//		
+//		return putVarSet(VARSET_G0L0, d);
+//	}
 	
-	BDDVarSet getG0G1G2L0L1L2VarSet() {
-		
-		if (varsets != null && varsets[VARSET_G0G1G2L0L1L2] != null)
-			return varsets[VARSET_G0G1G2L0L1L2];
-		
-		BDDDomain[] d = new BDDDomain[3*gnum + 3*lvmax + ((smax > 0) ? smax + 1 : 0)];
-		int j = 0;
-		for (int i = 0; i < gnum; i++) {
-			d[j++] = doms[g0 + globalcopy*i];
-			d[j++] = doms[g0 + globalcopy*i + gindex[1]];
-			d[j++] = doms[g0 + globalcopy*i + gindex[2]];
-		}
-		for (int i = 0; i < lvmax; i++) {
-			d[j++] = doms[l0 + VarManager.varcopy*i];
-			d[j++] = doms[l0 + VarManager.varcopy*i + 1];
-			d[j++] = doms[l0 + VarManager.varcopy*i + 2];
-		}
-		if (smax > 0) {
-			d[j++] = getStackPointerDomain();
-			for (int i = 0; i < smax; i++)
-				d[j++] = getStackDomain(i);
-		}
-		
-		return putVarSet(VARSET_G0G1G2L0L1L2, d);
-	}
+//	BDDVarSet getG0G1G2L0L1L2VarSet() {
+//		
+//		if (varsets != null && varsets[VARSET_G0G1G2L0L1L2] != null)
+//			return varsets[VARSET_G0G1G2L0L1L2];
+//		
+//		BDDDomain[] d = new BDDDomain[3*gnum + 3*lvmax + ((smax > 0) ? smax + 1 : 0)];
+//		int j = 0;
+//		for (int i = 0; i < gnum; i++) {
+//			d[j++] = doms[g0 + globalcopy*i];
+//			d[j++] = doms[g0 + globalcopy*i + gindex[1]];
+//			d[j++] = doms[g0 + globalcopy*i + gindex[2]];
+//		}
+//		for (int i = 0; i < lvmax; i++) {
+//			d[j++] = doms[l0 + VarManager.varcopy*i];
+//			d[j++] = doms[l0 + VarManager.varcopy*i + 1];
+//			d[j++] = doms[l0 + VarManager.varcopy*i + 2];
+//		}
+//		if (smax > 0) {
+//			d[j++] = getStackPointerDomain();
+//			for (int i = 0; i < smax; i++)
+//				d[j++] = getStackDomain(i);
+//		}
+//		
+//		return putVarSet(VARSET_G0G1G2L0L1L2, d);
+//	}
 	
-	BDDVarSet getG0L0G1L1VarSet() {
-		
-		if (varsets != null && varsets[VARSET_G0L0G1L1] != null)
-			return varsets[VARSET_G0L0G1L1];
-		
-		BDDDomain[] d = new BDDDomain[2*gnum + 2*lvmax + ((smax > 0) ? smax + 1 : 0)];
-		int j = 0;
-		for (int i = 0; i < gnum; i++) {
-			d[j++] = doms[g0 + globalcopy*i];
-			d[j++] = doms[g0 + globalcopy*i + gindex[1]];
-		}
-		for (int i = 0; i < lvmax; i++) {
-			d[j++] = doms[l0 + varcopy*i];
-			d[j++] = doms[l0 + varcopy*i + 1];
-		}
-		if (smax > 0) {
-			d[j++] = getStackPointerDomain();
-			for (int i = 0; i < smax; i++)
-				d[j++] = getStackDomain(i);
-		}
-		
-		return putVarSet(VARSET_G0L0G1L1, d);
-	}
+//	BDDVarSet getG0L0G1L1VarSet() {
+//		
+//		if (varsets != null && varsets[VARSET_G0L0G1L1] != null)
+//			return varsets[VARSET_G0L0G1L1];
+//		
+//		BDDDomain[] d = new BDDDomain[2*gnum + 2*lvmax + ((smax > 0) ? smax + 1 : 0)];
+//		int j = 0;
+//		for (int i = 0; i < gnum; i++) {
+//			d[j++] = doms[g0 + globalcopy*i];
+//			d[j++] = doms[g0 + globalcopy*i + gindex[1]];
+//		}
+//		for (int i = 0; i < lvmax; i++) {
+//			d[j++] = doms[l0 + varcopy*i];
+//			d[j++] = doms[l0 + varcopy*i + 1];
+//		}
+//		if (smax > 0) {
+//			d[j++] = getStackPointerDomain();
+//			for (int i = 0; i < smax; i++)
+//				d[j++] = getStackDomain(i);
+//		}
+//		
+//		return putVarSet(VARSET_G0L0G1L1, d);
+//	}
 	
 	BDDVarSet getL0G1L1VarSet() {
 		
@@ -1757,20 +1774,20 @@ public class VarManager {
 		return putVarSet(VARSET_L0G1L1G2L2, d);
 	}
 	
-	BDDVarSet getG0G4VarSet() {
-		
-		if (varsets != null && varsets[VARSET_G0G4] != null)
-			return varsets[VARSET_G0G4];
-		
-		BDDDomain[] d = new BDDDomain[2*gnum];
-		int j = 0;
-		for (int i = 0; i < gnum; i++) {
-			d[j++] = doms[g0 + globalcopy*i];
-			d[j++] = doms[g0 + globalcopy*i + gindex[4]];
-		}
-		
-		return putVarSet(VARSET_G0G4, d);
-	}
+//	BDDVarSet getG0G4VarSet() {
+//		
+//		if (varsets != null && varsets[VARSET_G0G4] != null)
+//			return varsets[VARSET_G0G4];
+//		
+//		BDDDomain[] d = new BDDDomain[2*gnum];
+//		int j = 0;
+//		for (int i = 0; i < gnum; i++) {
+//			d[j++] = doms[g0 + globalcopy*i];
+//			d[j++] = doms[g0 + globalcopy*i + gindex[4]];
+//		}
+//		
+//		return putVarSet(VARSET_G0G4, d);
+//	}
 	
 	BDDVarSet getG1L1VarSet() {
 		if (varsets != null && varsets[VARSET_G1L1] != null)
@@ -2023,7 +2040,7 @@ public class VarManager {
 		log(1, msg, args);
 	}
 	
-	private static boolean log() {
+	protected static boolean log() {
 		return verbosity >= 2;
 	}
 	

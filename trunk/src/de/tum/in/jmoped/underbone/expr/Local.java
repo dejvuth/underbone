@@ -28,6 +28,10 @@ public class Local {
 		this.index = index;
 	}
 	
+	public Category getCategory() {
+		return category;
+	}
+	
 	public String toString() {
 		return String.format("%s index:%d", category, index);
 	}

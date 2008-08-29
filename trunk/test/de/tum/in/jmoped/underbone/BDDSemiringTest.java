@@ -6,8 +6,6 @@ import static de.tum.in.jmoped.underbone.ExprType.NEWARRAY;
 import static de.tum.in.jmoped.underbone.ExprType.PUSH;
 import static de.tum.in.jmoped.underbone.ExprType.SWAP;
 import static de.tum.in.jmoped.underbone.ExprType.UNARYOP;
-import static de.tum.in.jmoped.underbone.expr.Newarray;
-import static de.tum.in.jmoped.underbone.expr.Value;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -22,7 +20,11 @@ import net.sf.javabdd.BDD.BDDIterator;
 import org.junit.Assert;
 import org.junit.Test;
 
+import de.tum.in.jmoped.underbone.expr.Category;
+import de.tum.in.jmoped.underbone.expr.Invoke;
+import de.tum.in.jmoped.underbone.expr.Local;
 import de.tum.in.jmoped.underbone.expr.Newarray;
+import de.tum.in.jmoped.underbone.expr.Unaryop;
 import de.tum.in.jmoped.underbone.expr.Value;
 import de.tum.in.wpds.CancelMonitor;
 import de.tum.in.wpds.DefaultMonitor;
@@ -37,6 +39,7 @@ public class BDDSemiringTest {
 	 * @return a variable manager.
 	 */
 	static VarManager init() {
+		VarManager.setVerbosity(2);
 		VarManager manager =  new VarManager("cudd", 10000, 10000, 
 				3, new long[] { 8, 8, 8, 8, 8, 8, 8 }, null, 3, 3, 1, false);
 		System.out.printf("Factory used: %s%n", manager.getFactory().getClass().getName());
@@ -75,11 +78,43 @@ public class BDDSemiringTest {
 		}
 	}
 	
+	private void printBDD() {
+		Iterator<Semiring> itr = stack.iterator();
+		int count = 0;
+		while (itr.hasNext()) {
+			System.out.printf("\t%d:\t", count++);
+			System.out.println(((BDDSemiring) itr.next()).bdd.toStringWithDomains());
+			System.out.println();
+		}
+	}
+	
 	private void free() {
 		Iterator<Semiring> itr = stack.iterator();
 		while (itr.hasNext()) {
 			itr.next().free();
 		}
+	}
+	
+	@Test public void testPush() {
+		VarManager manager = init();
+		Semiring[] expr = new Semiring[] {
+				new BDDSemiring(manager, manager.initVars()),
+				new ExprSemiring(PUSH, new Value(Category.ONE, 4)),
+				new ExprSemiring(ExprType.STORE, new Local(Category.ONE, 1))
+		};
+		BDD bdd = run(expr);
+		printBDD();
+	}
+	
+	@Test public void testInvoke() {
+		VarManager manager = init();
+		Semiring[] expr = new Semiring[] {
+				new BDDSemiring(manager, manager.initVars()),
+//				new ExprSemiring(PUSH, new Value(Category.ONE, 4)),
+				new ExprSemiring(ExprType.INVOKE, new Invoke())
+		};
+		BDD bdd = run(expr);
+		printBDD();
 	}
 	
 	/**
@@ -95,9 +130,9 @@ public class BDDSemiringTest {
 		 */
 		Semiring[] expr = new Semiring[] {
 				new BDDSemiring(manager, manager.initVars()),
-				new ExprSemiring(PUSH, new Value(0, 1, 3)),
-				new ExprSemiring(NEWARRAY, new Newarray(new Value(2))),
-				new ExprSemiring(PUSH, new Value(1)),
+				new ExprSemiring(PUSH, new Value(Category.ONE, 0, 1, 3)),
+				new ExprSemiring(NEWARRAY, new Newarray(new Value(Category.ONE,2))),
+				new ExprSemiring(PUSH, new Value(Category.ONE,1)),
 				new ExprSemiring(ARRAYLOAD)
 		};
 		BDD bdd = run(expr);
@@ -125,10 +160,10 @@ public class BDDSemiringTest {
 		 */
 		Semiring[] expr = new Semiring[] {
 				new BDDSemiring(manager, manager.initVars()),
-				new ExprSemiring(PUSH, new Value(0, 1, 3)),
+				new ExprSemiring(PUSH, new Value(Category.ONE,0, 1, 3)),
 				new ExprSemiring(NEWARRAY, new Newarray()),
-				new ExprSemiring(PUSH, new Value(1)),
-				new ExprSemiring(PUSH, new Value(2)),
+				new ExprSemiring(PUSH, new Value(Category.ONE,1)),
+				new ExprSemiring(PUSH, new Value(Category.ONE,2)),
 				new ExprSemiring(ARRAYSTORE)
 		};
 		BDD bdd = run(expr);
@@ -152,8 +187,8 @@ public class BDDSemiringTest {
 		// Pushes and swaps
 		Semiring[] expr = new Semiring[] {
 				new BDDSemiring(manager, manager.initVars()),
-				new ExprSemiring(PUSH, new Value(-1, 1, 1)),
-				new ExprSemiring(PUSH, new Value(2, 1, 3)),
+				new ExprSemiring(PUSH, new Value(Category.ONE, -1, 1, 1)),
+				new ExprSemiring(PUSH, new Value(Category.ONE, 2, 1, 3)),
 				new ExprSemiring(SWAP)
 		};
 		BDD bdd = run(expr);
@@ -183,9 +218,9 @@ public class BDDSemiringTest {
 		// Pushes and checks for containment.
 		Semiring[] expr = new Semiring[] {
 				new BDDSemiring(manager, manager.initVars()),
-				new ExprSemiring(PUSH, new Value(3)),
-				new ExprSemiring(UNARYOP, ExprSemiring.UnaryOpType.CONTAINS, 
-						new HashSet<Integer>(Arrays.asList(1, 3, 4)))
+				new ExprSemiring(PUSH, new Value(Category.ONE, 3)),
+				new ExprSemiring(UNARYOP, new Unaryop(Unaryop.Type.CONTAINS, 
+						new HashSet<Integer>(Arrays.asList(1, 3, 4))))
 		};
 		BDD bdd = run(expr);
 		
@@ -197,9 +232,9 @@ public class BDDSemiringTest {
 		// Pushes and checks for containment.
 		expr = new Semiring[] {
 				new BDDSemiring(manager, manager.initVars()),
-				new ExprSemiring(PUSH, new Value(2)),
-				new ExprSemiring(UNARYOP, ExprSemiring.UnaryOpType.CONTAINS, 
-						new HashSet<Integer>(Arrays.asList(1, 3, 4)))
+				new ExprSemiring(PUSH, new Value(Category.ONE, 2)),
+				new ExprSemiring(UNARYOP, new Unaryop(Unaryop.Type.CONTAINS, 
+						new HashSet<Integer>(Arrays.asList(1, 3, 4))))
 		};
 		bdd = run(expr);
 		
