@@ -186,9 +186,9 @@ public class VirtualMachine {
 			
 			if (monitor.isCanceled()) break;
 			
-			log("ptr: %d, heap: %s%n", heap.size(), heap);
-			log("globals: %s%n", globals);
-			log("frame: %s%n%n", frame);
+			debug("ptr: %d, heap: %s%n", heap.size(), heap);
+			debug("globals: %s%n", globals);
+			debug("frame: %s%n%n", frame);
 			if (listener != null) listener.reach(frame.label);
 			
 			Config config = new Config(Remopla.p, frame.label);
@@ -199,7 +199,7 @@ public class VirtualMachine {
 			boolean thisrule = false;
 			for (Rule rule : rules) {
 				
-				log("\t%s%n", rule);
+				debug("\t%s%n", rule);
 				
 				/*
 				 *  Controls whether this rule is the right rule.
@@ -468,6 +468,7 @@ public class VirtualMachine {
 				}
 				
 				case ExprType.HEAPRESTORE: {
+					info("Heap used: %d blocks%n", heap.size());
 					heap = heapsave;
 					globals = globalssave;
 					break;
@@ -611,7 +612,7 @@ public class VirtualMachine {
 					}
 					
 					String msg = "(" + toCommaString(display) + ")";
-					log("\t\t%s%n", msg);
+					debug("\t\t%s%n", msg);
 					monitor.subTask(msg);
 					break;
 				}
@@ -620,12 +621,12 @@ public class VirtualMachine {
 					Npe npe = (Npe) d.value;
 					int ptr = frame.get(frame.stack.size() - npe.depth - 1).intValue();
 					int index = frame.get(frame.stack.size() - npe.depth).intValue();
-					log("\t\tptr: %d, index: %d%n", ptr, index);
+					debug("\t\tptr: %d, index: %d%n", ptr, index);
 					if (arraylength(ptr).intValue() > index) {
 						thisrule = false;
 						break;
 					}
-					log("\tArrayIndexOutOfBoundException%n");
+					debug("\tArrayIndexOutOfBoundException%n");
 					break;
 				}
 				
@@ -697,7 +698,7 @@ public class VirtualMachine {
 						require += acc * (s[i] + 1);
 						acc *= s[i];
 					}
-					log("\t\trequire: %d%n", require);
+					debug("\t\trequire: %d%n", require);
 					
 					Queue<Integer> indices = new LinkedList<Integer>();
 					for (int i = 1; i <= newarray.dim; i++) {
@@ -710,7 +711,7 @@ public class VirtualMachine {
 						
 						// Fills blocks
 						int blocksize = s[i - 1];
-						log("\t\tblocknum: %d, blocksize: %d%n", blocknum, blocksize);
+						debug("\t\tblocknum: %d, blocksize: %d%n", blocknum, blocksize);
 						for (int j = 0; j < blocknum; j++) {
 							
 							// Remember the index
@@ -887,12 +888,12 @@ public class VirtualMachine {
 			
 			// If no matching rule found
 			if (!thisrule) {
-				log("\tno matching rule found%n");
+				debug("\tno matching rule found%n");
 				do {
 					frame = frames.pop();
 				} while (!frames.isEmpty());
 			}
-			log("%n");
+			debug("%n");
 		}
 		
 		listener.done();
@@ -914,7 +915,7 @@ public class VirtualMachine {
 		
 		if (length > index) return false;
 		
-		log("\tArrayIndexOutOfBoundException%n");
+		debug("\tArrayIndexOutOfBoundException%n");
 		String ioob = LabelUtils.formatIoobName(label);
 		if (listener != null) listener.reach(ioob);
 		error(ioob, raw, frames);
@@ -927,7 +928,7 @@ public class VirtualMachine {
 		
 		if (ptr != 0) return false;
 		
-		log("\tNullPointerException%n");
+		debug("\tNullPointerException%n");
 		String npe = LabelUtils.formatNpeName(label);
 		if (listener != null) listener.reach(npe);
 		error(npe, raw, frames);
@@ -960,8 +961,28 @@ public class VirtualMachine {
 		verbosity = level;
 	}
 	
-	public static void log(String msg, Object... args) {
-		if (verbosity >= 2)
+	/**
+	 * Logs the information message.
+	 * 
+	 * @param msg the message.
+	 * @param args the message arguments.
+	 */
+	static void info(String msg, Object... args) {
+		log(1, msg, args);
+	}
+	
+	/**
+	 * Logs the debug message.
+	 * 
+	 * @param msg the message.
+	 * @param args the message arguments.
+	 */
+	static void debug(String msg, Object... args) {
+		log(2, msg, args);
+	}
+	
+	private static void log(int threshold, String msg, Object... args) {
+		if (verbosity >= threshold)
 			logger.fine(String.format(msg, args));
 	}
 	

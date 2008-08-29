@@ -59,4 +59,16 @@ public class RawArgument {
 	public String toString() {
 		return String.format("lv: %s, heap: %s", Arrays.toString(lv), Arrays.toString(heap));
 	}
+	
+	public boolean equals(Object obj) {
+		if (obj == null || !(obj instanceof RawArgument))
+			return false;
+		
+		RawArgument ra = (RawArgument) obj;
+		return Arrays.equals(heap, ra.heap) && Arrays.equals(lv, ra.lv);
+	}
+	
+	public int hashCode() {
+		return 31*Arrays.hashCode(heap) + Arrays.hashCode(lv);
+	}
 }

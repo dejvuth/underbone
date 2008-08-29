@@ -1,7 +1,6 @@
 package de.tum.in.jmoped.underbone;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -78,100 +77,182 @@ public class BDDSemiring implements Semiring {
 	 * 
 	 */
 	public Semiring combine(Semiring a) {
-		
-		return new BDDSemiring(manager, bdd.or(((BDDSemiring) a).bdd));
+		BDD b = bdd.or(((BDDSemiring) a).bdd);
+		return new BDDSemiring(manager, b);
 	}
 	
-	/**
-	 * Loads the variables specified by <code>vdoms</code> onto the stack
-	 * of <code>bdd</code>. The first variable from <code>vdoms</code> will
-	 * be the depth-most element.
-	 * 
-	 * @param vdoms the variable domains.
-	 * @return new BDD where the variables are pushed.
-	 */
-	private BDD load(BDD bdd, BDDDomain... vdoms) {
+//	/**
+//	 * Loads the variables specified by <code>vdoms</code> onto the stack
+//	 * of <code>bdd</code>. The first variable from <code>vdoms</code> will
+//	 * be the depth-most element.
+//	 * 
+//	 * @param vdoms the variable domains.
+//	 * @return new BDD where the variables are pushed.
+//	 */
+//	private BDD load(BDD bdd, BDDDomain... vdoms) {
+//		
+////		log("bdd: %s%n", bdd);
+//		/* 
+//		 * Prepares stack domains:
+//		 * index 0 is stack pointer, last index is top of stack
+//		 */ 
+//		BDDDomain[] sdoms = new BDDDomain[vdoms.length + 1];
+//		sdoms[0] = manager.getStackPointerDomain();
+//		int sp = bdd.scanVar(sdoms[0]).intValue();
+//		for (int i = 0; i < vdoms.length; i++)
+//			sdoms[i + 1] = manager.getStackDomain(sp + i);
+//		
+//		// Abstracts stack pointer and stack
+//		BDD c = abstractVars(bdd, sdoms);
+//		
+//		/*
+//		 *  Updates stack pointer and stack:
+//		 *  the depth-most element gets the first variable
+//		 */
+//		c.andWith(sdoms[0].ithVar(sp + vdoms.length));
+//		for (int i = 0; i < vdoms.length; i++) {
+//			if (vdoms[i] == null)	// Pushes dummy zero in case of null
+//				c.andWith(sdoms[i+1].ithVar(0));
+//			else {
+//				BDD eq = manager.bddEquals(sdoms[i + 1], vdoms[i]);
+////				log("eq: %s%n", eq);
+//				c.andWith(eq);
+//			}
+//		}
+//		
+////		log("c: %s%n", c);
+//		return c;
+//	}
+	
+//	private BDD load(BDD bdd, BDDDomain vdom) {
+//		// Gets domains: sp and s[sp]
+//		BDDDomain spdom = manager.getStackPointerDomain();
+//		int sp = bdd.scanVar(spdom).intValue();
+//		BDDDomain s0dom = manager.getStackDomain(sp);
+//		
+//		// Abstracts sp and s[sp]
+//		BDDVarSet abs = spdom.set().unionWith(s0dom.set());
+//		BDD c = bdd.exist(abs);
+//		abs.free();
+//		
+//		// Updates stack pointer and stack
+//		c.andWith(spdom.ithVar(sp + 1));
+//		c.andWith(s0dom.buildEquals(vdom));
+//		return c;
+//	}
+	
+	private BDD load(int cat, BDD bdd, BDDDomain vdom1, BDDDomain vdom2) {
+		// Gets domains: sp, s[sp], and s[sp+1]
+		BDDDomain spdom = manager.getStackPointerDomain();
+		int sp = bdd.scanVar(spdom).intValue();
+		BDDDomain s0dom = manager.getStackDomain(sp);
+		BDDDomain s1dom = null;
+		if (cat == 2)
+			s1dom = manager.getStackDomain(sp + 1);
 		
-		/* 
-		 * Prepares stack domains:
-		 * index 0 is stack pointer, last index is top of stack
-		 */ 
-		BDDDomain[] sdoms = new BDDDomain[vdoms.length + 1];
-		sdoms[0] = manager.getStackPointerDomain();
-		int sp = bdd.scanVar(sdoms[0]).intValue();
-		for (int i = 0; i < vdoms.length; i++)
-			sdoms[i + 1] = manager.getStackDomain(sp + i);
+		// Abstracts sp, s[sp], and s[sp+1]
+		BDDVarSet abs = spdom.set().unionWith(s0dom.set());
+		if (cat == 2)
+			abs.unionWith(s1dom.set());
+		BDD c = bdd.exist(abs);
+		abs.free();
 		
-		// Abstracts stack pointer and stack
-		BDD c = abstractVars(bdd, sdoms);
-		
-		/*
-		 *  Updates stack pointer and stack:
-		 *  the depth-most element gets the first variable
-		 */
-		c.andWith(sdoms[0].ithVar(sp + vdoms.length));
-		for (int i = 0; i < vdoms.length; i++) {
-			if (vdoms[i] == null)	// Pushes dummy zero in case of null
-				c.andWith(sdoms[i+1].ithVar(0));
-			else {
-				BDD eq = manager.bddEquals(sdoms[i + 1], vdoms[i]);
-				c.andWith(eq);
-			}
-		}
-		
+		// Updates stack pointer and stack: vdom1 goes to s[sp]
+		c.andWith(spdom.ithVar(sp + cat));
+		c.andWith(s0dom.buildEquals(vdom1));
+		if (cat == 2)
+			c.andWith((vdom2 == null) ? s1dom.ithVar(0) : s1dom.buildEquals(vdom2));
 		return c;
 	}
 	
-	/**
-	 * Stores the values at the top of the stack of <code>bdd</code>
-	 * to the variables specified by <code>doms</code>.
-	 * The first variable from <code>doms</code> gets the depth-most element.
-	 * 
-	 * @param doms the vairable domains.
-	 * @return new BDD where the variables get the stack values.
-	 */
-	private BDD store(BDD bdd, BDDDomain... vdoms) {
+//	/**
+//	 * Stores the values at the top of the stack of <code>bdd</code>
+//	 * to the variables specified by <code>doms</code>.
+//	 * The first variable from <code>doms</code> gets the depth-most element.
+//	 * 
+//	 * @param doms the vairable domains.
+//	 * @return new BDD where the variables get the stack values.
+//	 */
+//	private BDD store(BDD bdd, BDDDomain... vdoms) {
+//		
+//		/* 
+//		 * Prepares stack domains:
+//		 * index 0 is stack pointer, last index is top of stack
+//		 */ 
+//		BDDDomain[] sdoms = new BDDDomain[vdoms.length + 1];
+//		sdoms[0] = manager.getStackPointerDomain();
+//		int sp = bdd.scanVar(sdoms[0]).intValue();
+//		for (int i = 0; i < vdoms.length; i++)
+//			sdoms[i + 1] = manager.getStackDomain(sp - vdoms.length + i);
+//		
+//		// Abstracts local variables
+//		BDD c = abstractVars(bdd, vdoms);
+//		
+//		/*
+//		 *  Copies the stack to variables:
+//		 *  the first variable gets the depth-most element
+//		 */
+//		for (int i = 0; i < vdoms.length; i++) {
+//			// Ignores null domain
+//			if (vdoms[i] == null)
+//				continue;
+//			
+//			c.andWith(manager.bddEquals(sdoms[i + 1], vdoms[i]));
+//		}
+//		
+//		// Abstracts the stack and updates the stack pointer
+//		BDD d = abstractVars(c, sdoms);
+//		c.free();
+//		d.andWith(sdoms[0].ithVar(sp - vdoms.length));
+//		
+//		return d;
+//	}
+	
+	private BDD store(int cat, BDD bdd, BDDDomain vdom1, BDDDomain vdom2) {
+		// Gets domains: sp, s[sp-1], and s[sp-2]
+		BDDDomain spdom = manager.getStackPointerDomain();
+		int sp = bdd.scanVar(spdom).intValue();
+		BDDDomain s0dom = manager.getStackDomain(sp - 1);
+		BDDDomain s1dom = null;
+		if (cat == 2)
+			s1dom = manager.getStackDomain(sp - 2);
 		
-		/* 
-		 * Prepares stack domains:
-		 * index 0 is stack pointer, last index is top of stack
-		 */ 
-		BDDDomain[] sdoms = new BDDDomain[vdoms.length + 1];
-		sdoms[0] = manager.getStackPointerDomain();
-		int sp = bdd.scanVar(sdoms[0]).intValue();
-		for (int i = 0; i < vdoms.length; i++)
-			sdoms[i + 1] = manager.getStackDomain(sp - vdoms.length + i);
+		// Abstracts vdom1 and vdom2
+		BDDVarSet abs = vdom1.set();
+		if (cat == 2 && vdom2 != null)
+			abs.unionWith(vdom2.set());
+		BDD c = bdd.exist(abs);
+		abs.free();
 		
-		// Abstracts local variables
-		BDD c = abstractVars(bdd, vdoms);
-		
-		/*
-		 *  Copies the stack to variables:
-		 *  the first variable gets the depth-most element
-		 */
-		for (int i = 0; i < vdoms.length; i++) {
-			// Ignores null domain
-			if (vdoms[i] == null)
-				continue;
-			
-			c.andWith(manager.bddEquals(sdoms[i + 1], vdoms[i]));
+		// Updates the local vars
+		if (cat == 1) {
+			c.andWith(s0dom.buildEquals(vdom1));
+		} else {	// cat == 2
+			c.andWith(s1dom.buildEquals(vdom1));
+			if (vdom2 != null)
+				c.andWith(s0dom.buildEquals(vdom2));
 		}
 		
-		// Abstracts the stack and updates the stack pointer
-		BDD d = abstractVars(c, sdoms);
+		// Abstracts sp, s[sp-1], and s[sp-2]
+		abs = spdom.set().unionWith(s0dom.set());
+		if (cat == 2)
+			abs.unionWith(s1dom.set());
+		BDD d = c.exist(abs);
+		abs.free();
 		c.free();
-		d.andWith(sdoms[0].ithVar(sp - vdoms.length));
 		
+		// Updates sp
+		d.andWith(spdom.ithVar(sp - cat));
 		return d;
 	}
 	
 	private void log(BDD bdd) {
-		if (Sat.DEBUG)
+		if (Sat.debug())
 			log("%n\t\t%s%n%n", manager.toString(bdd, "\n\t\t"));
 	}
 	
 	private void logRaw(BDD bdd) {
-		if (Sat.DEBUG)
+		if (Sat.all())
 			log("%n\t\t%s%n%n", bdd.toStringWithDomains());
 	}
 
@@ -183,144 +264,147 @@ public class BDDSemiring implements Semiring {
 		ExprSemiring A = (ExprSemiring) a;
 		
 		log(bdd);
-//		logRaw(bdd);
+		logRaw(bdd);
+		
+		BDDSemiring b = null;
 		
 		try {
 		switch (A.type) {
 		
 		case ExprType.ARITH:
-			return arith(A);
+			b = arith(A); break;
 		
 		case ExprType.ARRAYLENGTH:
-			return arraylength(A);
+			b = arraylength(A); break;
 		
 		// Pushes from heap: s0 = heap[s1+s0+1], sp=sp-1;
 		case ExprType.ARRAYLOAD:
-			return arrayload(A);
+			b = arrayload(A); break;
 		
 		// Pops to heap: heap[s2+s1+1]=s0, sp=sp-3;
 		case ExprType.ARRAYSTORE:
-			return arraystore(A);
+			b = arraystore(A); break;
 		
 		case ExprType.CONSTLOAD:
-			return constload(A);
+			b = constload(A); break;
 			
 		case ExprType.CONSTSTORE:
-			return conststore(A);
+			b = conststore(A); break;
 		
 		case ExprType.DUP:
-			return dup(A);
+			b = dup(A); break;
 		
 		case ExprType.DYNAMIC:
-			return dynamic(A);
+			b = dynamic(A); break;
 			
 		// Identity
 		case ExprType.ERROR:
-			return error(A);
+			b = error(A); break;
 		
 		case ExprType.FIELDLOAD:
-			return fieldload(A);
+			b = fieldload(A); break;
 		
 		case ExprType.FIELDSTORE:
-			return fieldstore(A);
+			b = fieldstore(A); break;
 		
 		// Pushes ret value into the stack
 		case ExprType.GETRETURN:
-			return getreturn(A);
+			b = getreturn(A); break;
 		
 		// Pushes from global variable
 		case ExprType.GLOBALLOAD:
-			return globalload(A);
+			b = globalload(A); break;
 		
 		// Stores a constant to global variable
 		case ExprType.GLOBALPUSH: {
 			BDDDomain gdom = manager.getGlobalVarDomain((String) A.value);
 			BDD c = abstractVars(bdd, gdom);
 			c.andWith(gdom.ithVar((Integer) A.aux));
-			return new BDDSemiring(manager, c);
+			b = new BDDSemiring(manager, c);
+			break;
 		}
 		
 		// Pops to global variable
 		case ExprType.GLOBALSTORE:
-			return globalstore(A);
+			b = globalstore(A); break;
 		
 		case ExprType.HEAPLOAD:
-			return heapload(A);
+			b = heapload(A); break;
 			
 		case ExprType.HEAPOVERFLOW:
-			return heapoverflow(A);
+			b = heapoverflow(A); break;
 			
 		// Pops and compares
 		case ExprType.IF:
-			return ifExpr(A);
+			b = ifExpr(A); break;
 		
 		// Pops twice and compares s1 with s0
 		case ExprType.IFCMP:
-			return ifcmp(A);
+			b = ifcmp(A); break;
 		
 		case ExprType.INC:
-			return inc(A);
+			b = inc(A); break;
 		
 		// Method invocation: (G0,L0,G1,L1) -> (G2,L2,L0,G1,L1)
 		case ExprType.INVOKE:
-			return invoke(A);
+			b = invoke(A); break;
 			
 		case ExprType.IOOB:
-			return ioob(A);
+			b = ioob(A); break;
 			
 		case ExprType.JUMP:
-			return jump(A);
+			b = jump(A); break;
 		
 		// Pushes from local variable
 		case ExprType.LOAD:
-			return load(A);
+			b = load(A); break;
 		
 		case ExprType.MONITORENTER:
-			return monitorenter(A);
+			b = monitorenter(A); break;
 			
 		case ExprType.MONITOREXIT:
-			return monitorexit(A);
+			b = monitorexit(A); break;
 		
 		case ExprType.NEW:
-			return newExpr(A);
+			b = newExpr(A); break;
 		
 		case ExprType.NEWARRAY:
-			return newarray(A);
+			b = newarray(A); break;
 			
 		case ExprType.NOTIFY:
-			return notify(A);
+			b = notify(A); break;
 			
 		case ExprType.NPE:
-			return npe(A);
+			b = npe(A); break;
 		
 		case ExprType.POPPUSH:
-			return poppush(A);
+			b = poppush(A); break;
 		
 		case ExprType.PRINT:
-			return print(A);
+			b = print(A); break;
 		
 		// Pushes constant
 		case ExprType.PUSH:
-			return push(A);
+			b = push(A); break;
 		
 		case ExprType.RETURN:
-			return returnExpr(A);
+			b = returnExpr(A); break;
 		
 		// Pops to local variable
 		case ExprType.STORE:
-			return store(A);
+			b = store(A); break;
 		
 		case ExprType.SWAP:
-			return swap(A);
+			b = swap(A); break;
 		
 		case ExprType.UNARYOP:
-			return unaryop(A);
+			b = unaryop(A); break;
 		
 		case ExprType.WAITINVOKE:
-			return waitinvoke(A);
+			b = waitinvoke(A); break;
 			
 		case ExprType.WAITRETURN:
-			return waitreturn(A);
+			b = waitreturn(A); break;
 		}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -328,7 +412,9 @@ public class BDDSemiring implements Semiring {
 			System.out.println(A);
 		}
 		
-		return null;
+//		if (b != null && A.type != ExprType.INVOKE) 
+//			manager.store(b.bdd);
+		return b;
 	}
 	
 	/**
@@ -428,10 +514,12 @@ public class BDDSemiring implements Semiring {
 			// Prunes the original bdd with s0 and copies the length values to temp
 			BDDDomain ldom = manager.getArrayLengthDomain(s0);
 			BDD eq = manager.bddEquals(ldom, tdom);
-//			System.out.printf("ldom: %s%n", Arrays.toString(ldom.vars()));
-//			System.out.printf("tdom: %s%n", Arrays.toString(tdom.vars()));
-//			System.out.println(eq);
+//			log("\t\tldom: %s%n", Arrays.toString(ldom.uvars()));
+//			log("\t\ttdom: %s%n", Arrays.toString(tdom.uvars()));
+//			log("\t\tbefore: %s%n", c);
+//			log("\t\teq: %s%n", eq);
 			c.orWith(bdd.id().andWith(s0dom.ithVar(s0)).andWith(eq));
+//			log("\t\tafter: %s%n", c);
 //			System.out.println(c);
 		}
 		
@@ -610,6 +698,7 @@ public class BDDSemiring implements Semiring {
 					// Gets all possible s0 wrt. length, s1, and s2
 					f = e.id().andWith(ldom.ithVar(l));
 					BDDDomain hdom = manager.getArrayElementDomain(s2, s1);
+					
 					BDDIterator s0itr = manager.iterator(f, s0dom);
 					while (s0itr.hasNext()) {
 						
@@ -617,12 +706,14 @@ public class BDDSemiring implements Semiring {
 						BDD g = s0itr.nextBDD();
 						long s0 = g.scanVar(s0dom).longValue();
 						g.free();
+						log("\t\ts0: %d%n", s0);
 						
 						// Prunes the bdd to only for s0, length, s1, and s2
 						g = f.id().andWith(s0dom.ithVar(s0));
 						
 						// Updates the heap at the pruned bdd
-						c.orWith(abstractVars(g, hdom).andWith(hdom.ithVar(s0)));
+						BDD x = g.exist(hdom.set());
+						c.orWith(x.andWith(hdom.ithVar(s0)));
 						g.free();
 					}
 					f.free();
@@ -633,6 +724,7 @@ public class BDDSemiring implements Semiring {
 		}
 		
 		// Abstracts stack
+		log("\t\tAbstracting stack%n");
 		BDDDomain[] sdoms = new BDDDomain[category + 3];
 		sdoms[0] = spdom;
 		sdoms[1] = s2dom;
@@ -726,6 +818,12 @@ public class BDDSemiring implements Semiring {
 		return new BDDSemiring(manager, d);
 	}
 	
+	/**
+	 * sp = sp - 1;
+	 * 
+	 * @param A
+	 * @return
+	 */
 	private BDDSemiring dynamic(ExprSemiring A) {
 		
 		BDD c = fulfillsCondition(A);
@@ -819,7 +917,7 @@ public class BDDSemiring implements Semiring {
 			// Gets all possible heap value wrt. to s0
 			BDD d = bdd.id().andWith(s0dom.ithVar(s0));
 			BDDDomain hdom = manager.getHeapDomain(s0 + field.getId());
-			log("\t\thdom: %d%n", hdom.getIndex());
+//			log("\t\thdom: %s%n", Arrays.toString(hdom.vars()));
 			BDDIterator hitr = manager.iterator(d, hdom);
 			while (hitr.hasNext()) {
 				
@@ -827,16 +925,30 @@ public class BDDSemiring implements Semiring {
 				e = hitr.nextBDD();
 				long h = e.scanVar(hdom).longValue();
 				e.free();
-				c.orWith(d.id()
-						.andWith(hdom.ithVar(h))
-						.andWith(tdom.ithVar(h)));
-				log("\t\tPush %d%n", h);
+				
+//				log("\t\td: %s%n", d);
+				BDD x = hdom.ithVar(h);
+//				log("\t\tx: %s%n", x);
+				BDD y = tdom.ithVar(h);
+//				log("\t\ty: %s%n", y);
+				
+				BDD z = d.id().andWith(x);
+//				log("\t\tz: %s%n", z);
+				
+				z.andWith(y);
+//				log("\t\tz: %s%n", z);
+				
+				c.orWith(z);
+//				log("\t\tPush %d%n", h);
 			}
 			d.free();
 		}
 		
 		// NPE
-		if (c.isZero()) return new BDDSemiring(manager, c);
+		if (c.isZero()) {
+			log("\t\tZero BDD%n");
+			return new BDDSemiring(manager, c);
+		}
 		
 		// Abstracts s0
 		BDD d = abstractVars(c, s0dom);
@@ -880,35 +992,36 @@ public class BDDSemiring implements Semiring {
 		BDDDomain vdom = manager.getStackDomain(field.categoryTwo() ? sp - 2 : sp - 1);
 		BDDDomain rdom = manager.getStackDomain(field.categoryTwo() ? sp - 3 : sp - 2);
 		
-		// Gets all possible values
-		BDDIterator vitr = manager.iterator(bdd, vdom);
+		// Gets all possible references
+		BDDIterator ritr = manager.iterator(bdd, rdom);
 		c = bdd.getFactory().zero();
-		while (vitr.hasNext()) {
+		while (ritr.hasNext()) {
 			
-			// Gets a value
-			BDD e = vitr.nextBDD();
-			long v = e.scanVar(vdom).longValue();
+			// Gets a reference
+			BDD e = ritr.nextBDD();
+			long r = e.scanVar(rdom).longValue();
 			e.free();
 			
-			// Gets all possible reference wrt. the value
-			BDD d = bdd.id().andWith(vdom.ithVar(v));
-			BDDIterator ritr = manager.iterator(d, rdom);
-			while (ritr.hasNext()) {
+			// Gets the heap domain at referece + id
+			BDD d = bdd.id().andWith(rdom.ithVar(r));
+			BDDDomain hdom = manager.getHeapDomain(r + field.getId());
+			
+			// Gets all possible values wrt. the references
+			BDDIterator vitr = manager.iterator(d, vdom);
+			while (vitr.hasNext()) {
 				
-				// Gets a reference
-				e = ritr.nextBDD();
-				long r = e.scanVar(rdom).longValue();
-				log("\t\ts1: %d%n", r);
+				// Gets a value
+				e = vitr.nextBDD();
+				long v = e.scanVar(vdom).longValue();
+				log("\t\tref: %d, value:%d%n", r, v);
 				e.free();
 				
-				// Gets the heap domain at referece + id
-				BDDDomain hdom = manager.getHeapDomain(r + field.getId());
-				
 				// Prunes the bdd to only for s0 and s1
-				e = d.id().andWith(rdom.ithVar(r));
+				e = d.id().andWith(vdom.ithVar(v));
 				
 				// Abstracts the heap domain of the pruned bdd and updates to s0
-				c.orWith(abstractVars(e, hdom).andWith(hdom.ithVar(v)));
+				c.orWith(e.exist(hdom.set())
+						.andWith(hdom.ithVar(v)));
 				e.free();
 			}
 			d.free();
@@ -931,9 +1044,10 @@ public class BDDSemiring implements Semiring {
 	}
 	
 	private BDDSemiring getreturn(ExprSemiring A) {
-		Category category = (Category) A.value;
+		int cat = ((Category) A.value).intValue();
+		
 		BDDDomain rdom = manager.getRetVarDomain();
-		BDD d = category.one() ? load(bdd, rdom) : load(bdd, rdom, null);
+		BDD d = load(cat, bdd, rdom, null);
 		BDD c = abstractVars(d, rdom);
 		d.free();
 		return new BDDSemiring(manager, c);
@@ -947,9 +1061,8 @@ public class BDDSemiring implements Semiring {
 		
 		// Loads
 		Field field = (Field) A.value;
-		BDD d = (field.categoryTwo()) 
-				? load(c, manager.getGlobalVarDomain(field.getName()), null)
-				: load(c, manager.getGlobalVarDomain(field.getName()));
+		BDD d = load(field.getCategory().intValue(), c, 
+				manager.getGlobalVarDomain(field.getName()), null);
 		c.free();
 		return new BDDSemiring(manager, d);
 	}
@@ -960,11 +1073,11 @@ public class BDDSemiring implements Semiring {
 		if (c.isZero())
 			return new BDDSemiring(manager, c);
 		
-		// Stores
 		Field field = (Field) A.value;
-		BDD d = (field.categoryTwo())
-				? store(c, manager.getGlobalVarDomain(field.getName()), null)
-				: store(c, manager.getGlobalVarDomain(field.getName()));
+		BDDDomain gdom = manager.getGlobalVarDomain(field.getName());
+		
+		// Stores
+		BDD d = store(field.getCategory().intValue(), c, gdom, null);
 		c.free();
 		return new BDDSemiring(manager, d);
 	}
@@ -1223,7 +1336,10 @@ public class BDDSemiring implements Semiring {
 //		}
 		
 		// G0 becomes G2
+//		log("\t\tc: %s%n", c);
 		c.replaceWith(manager.getG0pairG2());
+//		log("\t\tpair: %s%n", manager.getG0pairG2());
+//		log("\t\tc: %s%n", c);
 		if (nargs == 0) return new BDDSemiring(manager, c);
 			
 		// Gets the current value of stack pointer (sp)
@@ -1312,7 +1428,7 @@ public class BDDSemiring implements Semiring {
 		Jump type = (Jump) A.value;
 		if (type.equals(Jump.ONE))
 			return new BDDSemiring(manager, c);
-		else {	// JumpType.THROW
+		else {	// Jump.THROW
 			
 			// Gets stack domains
 			BDDDomain spdom = manager.getStackPointerDomain();
@@ -1347,12 +1463,10 @@ public class BDDSemiring implements Semiring {
 	
 	private BDDSemiring load(ExprSemiring A) {
 		Local local = (Local) A.value;
-		BDD c;
-		if (local.category.one())
-			c = load(bdd, manager.getLocalVarDomain(local.index));
-		else // category 2
-			c = load(bdd, manager.getLocalVarDomain(local.index), 
-					manager.getLocalVarDomain(local.index + 1));
+		
+		BDD c = load(local.getCategory().intValue(), bdd,
+				manager.getLocalVarDomain(local.index), 
+				manager.getLocalVarDomain(local.index + 1));
 		return new BDDSemiring(manager, c);
 	}
 	
@@ -1375,9 +1489,19 @@ public class BDDSemiring implements Semiring {
 				continue;
 			}
 			
-			// Gets all possible counter values wrt. s0 and thread id
 			e = d.id().andWith(thdom.ithVar(th));
+			
+			long max = 0;
 			BDDIterator cntitr = manager.iterator(e, cntdom);
+			while (cntitr.hasNext()) {
+				BDD f = cntitr.nextBDD();
+				long cnt = f.scanVar(cntdom).longValue();
+				f.free();
+				if (cnt > max) max = cnt;
+			}
+			
+			// Gets all possible counter values wrt. s0 and thread id
+			cntitr = manager.iterator(e, cntdom);
 			while (cntitr.hasNext()) {
 				
 				// Gets a counter
@@ -1680,6 +1804,10 @@ public class BDDSemiring implements Semiring {
 				// Fills blocks
 				int blocksize = d.scanVar(doms[i - 1]).intValue();
 				log("\t\tblocknum: %d, blocksize: %d%n", blocknum, blocksize);
+				if (blocksize >= manager.size())
+					throw new RemoplaError("Not enough bits. An array is of " +
+							"size %d, in which %d bits are not enough.", 
+							blocksize, manager.getBits());
 				for (int j = 0; j < blocknum; j++) {
 					
 					// Remember the index
@@ -1690,18 +1818,22 @@ public class BDDSemiring implements Semiring {
 						throw new RemoplaError("Not enough bits. " +
 								"There are at least %d object types.", 
 								newarray.types[newarray.dim-i]);
-					e.andWith(manager.getHeapDomain(ptr++).ithVar(newarray.types[newarray.dim-i]));
+					BDDDomain hdom = manager.getHeapDomain(ptr++);
+					e.andWith(hdom.ithVar(newarray.types[newarray.dim-i]));
 					log("\t\tptr: %d%n", ptr);
+					
 					// Updtes ptr wrt. owner & counter
 					for (int k = 2; k < manager.getArrayAuxSize(); k++)
 						e.andWith(manager.getHeapDomain(ptr++).ithVar(0));
+					
 					// Fills the array length
-					e.andWith(manager.getHeapDomain(ptr++).ithVar(blocksize));
+					hdom = manager.getHeapDomain(ptr++);
+					e.andWith(hdom.ithVar(blocksize));
 					
 					// Fills the array elements
 					for (int k = 0; k < blocksize; k++) {
 						// Initializes the array values
-						BDDDomain hdom = manager.getHeapDomain(ptr++);
+						hdom = manager.getHeapDomain(ptr++);
 						BDD value;
 						if (i == 1) {
 							value = bddOf(newarray.init, hdom);
@@ -1709,7 +1841,8 @@ public class BDDSemiring implements Semiring {
 						
 						// Initializes the array indices
 						else {
-							value = hdom.ithVar(indices.remove());
+							int index = indices.remove();
+							value = hdom.ithVar(index);
 						}
 						e.andWith(value);
 					}
@@ -1730,42 +1863,7 @@ public class BDDSemiring implements Semiring {
 		return new BDDSemiring(manager, d);
 	}
 	
-	/**
-	 * Returns the BDD with variables specified by <code>dom</code>
-	 * representing <code>value</code>.
-	 * 
-	 * @param value the value.
-	 * @param dom the BDD domain.
-	 * @return the BDD representing the value.
-	 */
-	private BDD bddOf(Value value, BDDDomain dom) {
-		
-		// All values
-		if (value.all()) {
-			return bdd.getFactory().one();
-		} 
-		
-		// Deterministic values
-		if (value.deterministic()) {
-			if (value.isInteger()) {
-				return dom.ithVar(VarManager.encode(value.intValue(), dom));
-			} else if (value.isReal()) {
-				return dom.ithVar(manager.encode(value.floatValue(), dom));
-			} else {	// value.isString();
-				return dom.ithVar(manager.encode(value.stringValue(), dom));
-			}
-		} 
-		
-		// Nondeterministic, but not all
-		if (value.isReal())
-			return manager.bddRange(dom, value.floatValue(), value.next, 
-					value.to.floatValue());
-			
-		if (Sat.DEBUG)
-			log("\t\tvalue.intValue(): %d, value.to.intValue(): %d%n",
-					value.intValue(), value.to.intValue());
-		return manager.bddRange(dom, value.intValue(), value.to.intValue());
-	}
+
 	
 	private BDDSemiring newarrayx(ExprSemiring A) {
 		
@@ -2042,19 +2140,17 @@ public class BDDSemiring implements Semiring {
 		// Abstracts the stack
 		Value value = (Value) A.value;
 		int category = value.getCategory().intValue();
-		BDDDomain[] sdoms = new BDDDomain[category + 1];
-		sdoms[0] = spdom;
-		sdoms[1] = s0dom;
-		if (category == 2) 
-			sdoms[2] = manager.getStackDomain(sp + 1);
-		BDD d = abstractVars(c, sdoms);
+		BDDVarSet varset = spdom.set().unionWith(s0dom.set());
+		if (category == 2)
+			varset.unionWith(manager.getStackDomain(sp + 1).set());
+		BDD d = c.exist(varset);
 		c.free();
 		
 		// Updates the stack
 		d.andWith(spdom.ithVar(sp + category));
 		d.andWith(bddOf(value, s0dom));
 		if (category == 2)
-			d.andWith(sdoms[2].ithVar(0));
+			d.andWith(manager.getStackDomain(sp + 1).ithVar(0));
 		return new BDDSemiring(manager, d);
 	}
 	
@@ -2128,6 +2224,7 @@ public class BDDSemiring implements Semiring {
 //				return new BDDSemiring(manager, c);
 //			
 //		}
+//		log("g1l1_g2l2: %s%n", manager.getG1L1pairG2L2());
 		c.replaceWith(manager.getG1L1pairG2L2());
 		
 		// Debug: prints ret values
@@ -2147,12 +2244,9 @@ public class BDDSemiring implements Semiring {
 	
 	private BDDSemiring store(ExprSemiring A) {
 		Local local = (Local) A.value;
-		BDD c;
-		if (local.category.one())
-			c = store(bdd, manager.getLocalVarDomain(local.index));
-		else // category 2
-			c = store(bdd, manager.getLocalVarDomain(local.index), 
-					manager.getLocalVarDomain(local.index + 1));
+		BDD c = store(local.getCategory().intValue(), bdd, 
+				manager.getLocalVarDomain(local.index), 
+				manager.getLocalVarDomain(local.index + 1));
 		return new BDDSemiring(manager, c);
 	}
 	
@@ -2391,6 +2485,45 @@ public class BDDSemiring implements Semiring {
 	}
 	
 	/**
+	 * Returns the BDD with variables specified by <code>dom</code>
+	 * representing <code>value</code>.
+	 * 
+	 * @param value the value.
+	 * @param dom the BDD domain.
+	 * @return the BDD representing the value.
+	 */
+	public BDD bddOf(Value value, BDDDomain dom) {
+		
+		// All values
+		if (value.all()) {
+			return bdd.getFactory().one();
+		} 
+		
+		// Deterministic values
+		if (value.deterministic()) {
+			long v;
+			if (value.isInteger()) {
+				v = VarManager.encode(value.intValue(), dom);
+			} else if (value.isReal()) {
+				v = manager.encode(value.floatValue(), dom);
+			} else {	// value.isString();
+				v = manager.encode(value.stringValue(), dom);
+			}
+			return dom.ithVar(v);
+		}
+		
+		// Nondeterministic, but not all
+		if (value.isReal())
+			return manager.bddRange(dom, value.floatValue(), value.next, 
+					value.to.floatValue());
+			
+		if (Sat.all())
+			log("\t\tvalue.intValue(): %d, value.to.intValue(): %d%n",
+					value.intValue(), value.to.intValue());
+		return manager.bddRange(dom, value.intValue(), value.to.intValue());
+	}
+	
+	/**
 	 * Abstract the variables specified by doms from bdd.
 	 * The method ignores null domains, 
 	 * however the first domain must not be null.
@@ -2416,7 +2549,6 @@ public class BDDSemiring implements Semiring {
 	
 	/**
 	 * (G0,G2,L2) + (G2,L2,L0,G1,L1) -> (G0,L0,G1,L1)
-	 * 
 	 */
 	public Semiring extendPop(Semiring a, CancelMonitor monitor) {
 		
@@ -2440,6 +2572,7 @@ public class BDDSemiring implements Semiring {
 //		}
 //		log("%n");
 		
+//		manager.store(c);
 		return new BDDSemiring(manager, c);
 	}
 	
@@ -2577,6 +2710,7 @@ public class BDDSemiring implements Semiring {
 			d = manager.abstractStack(c);
 			c.free();
 			d.andWith(manager.buildG0L0equalsG1L1().id());
+//			manager.store(d);
 			return new BDDSemiring(manager, d);
 		}
 		
