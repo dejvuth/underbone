@@ -29,11 +29,11 @@ public class VarManagerTest {
 			
 			long j = 0;
 			for (long i = 0; i <= size/2 - 1; i++) {
-				long en = VarManager.encode((int) i, doms[0]);
+				long en = DomainManager.encode((int) i, doms[0]);
 				Assert.assertEquals(j++, en);
 			}
 			for (long i = -size/2; i <= -1; i++) {
-				long en = VarManager.encode((int) i, doms[0]);
+				long en = DomainManager.encode((int) i, doms[0]);
 				Assert.assertEquals(j++, en);
 			}
 		}
@@ -50,7 +50,7 @@ public class VarManagerTest {
 			int j = 0;
 			for (long i = 0; i < size; i++, j++) {
 				if (size > 2 && i == size/2) j = (int) (-size/2);
-				int de = VarManager.decode(i, doms[0]);
+				int de = DomainManager.decode(i, doms[0]);
 				try {
 					Assert.assertEquals(j, de);
 				} catch (AssertionError e) {
@@ -64,7 +64,7 @@ public class VarManagerTest {
 	
 	@Test public void testIthVar() {
 		
-		VarManager manager = new VarManager("cudd", 10000, 10000, 
+		DomainManager manager = new DomainManager("cudd", 10000, 10000, 
 				4, new long[] { 4, 4, 4 }, null, 1, 1, 1, false);
 		BDDDomain dom = manager.getHeapDomain(1);
 		Assert.assertEquals(4, dom.size().longValue());
@@ -91,7 +91,7 @@ public class VarManagerTest {
 	}
 	
 	@Test public void testBDDEquals() {
-		VarManager manager = new VarManager("cudd", 10000, 10000, 
+		DomainManager manager = new DomainManager("cudd", 10000, 10000, 
 				4, new long[] { 4, 4, 4 }, null, 1, 1, 1, false);
 		BDDDomain dom1 = manager.getHeapDomain(1);
 		System.out.printf("dom1: %s%n", Arrays.toString(dom1.vars()));
@@ -105,26 +105,97 @@ public class VarManagerTest {
 		BDDIterator itr = bdd.iterator(varset);
 		while (itr.hasNext()) {
 			BDD x = itr.nextBDD();
-			int a = VarManager.decode(x.scanVar(dom1).longValue(), dom1);
-			int b = VarManager.decode(x.scanVar(dom2).longValue(), dom2);
+			int a = DomainManager.decode(x.scanVar(dom1).longValue(), dom1);
+			int b = DomainManager.decode(x.scanVar(dom2).longValue(), dom2);
 			System.out.printf("a: %d, b: %d%n", a, b);
 			Assert.assertEquals(a, b);
 		}
 		
-		bdd.andWith(dom1.ithVar(VarManager.encode(-1, dom1)));
+		bdd.andWith(dom1.ithVar(DomainManager.encode(-1, dom1)));
 		itr = bdd.iterator(varset);
 		while (itr.hasNext()) {
 			BDD x = itr.nextBDD();
-			int a = VarManager.decode(x.scanVar(dom1).longValue(), dom1);
-			int b = VarManager.decode(x.scanVar(dom2).longValue(), dom2);
+			int a = DomainManager.decode(x.scanVar(dom1).longValue(), dom1);
+			int b = DomainManager.decode(x.scanVar(dom2).longValue(), dom2);
 			System.out.printf("a: %d, b: %d%n", a, b);
 			Assert.assertEquals(-1, a);
 			Assert.assertEquals(-1, b);
 		}
 	}
 	
+	private static void testScanVar(DomainManager manager, BDD bdd, BDDDomain dom, long expected) {
+		BDDIterator itr = bdd.iterator(dom.set());
+		int count = 0;
+		long elapsed1 = 0, elapsed2 = 0;
+		while (itr.hasNext()) {
+			BDD b = itr.nextBDD();
+			
+			long startTime = System.currentTimeMillis();
+			long value1 = DomainManager.scanVar(b, dom);
+			elapsed1 += System.currentTimeMillis() - startTime;
+			
+			startTime = System.currentTimeMillis();
+			long value2 = b.scanVar(dom).longValue();
+			elapsed2 += System.currentTimeMillis() - startTime;
+			
+			Assert.assertEquals(value1, value2);
+			b.free();
+			count++;
+		}
+		System.out.printf("scanVar - New: %d, Original: %d%n", elapsed1, elapsed2);
+		Assert.assertEquals(expected, count);
+	}
+	
+	@Test public void testScanVar() {
+		int bits = 20;
+		long size = 1 << bits;
+		DomainManager manager = new DomainManager("cudd", 10000, 10000, 
+				bits, new long[] { size, size, size }, null, 1, 1, 1, false);
+		BDDDomain hdom = manager.getHeapDomain(1);
+		
+		BDD a = manager.initVars();
+		Assert.assertEquals(0, DomainManager.scanVar(a, hdom));
+		Assert.assertEquals(1, DomainManager.scanVar(a, manager.getHeapPointerDomain()));
+		a.free();
+		
+		a = manager.getFactory().one();
+		testScanVar(manager, a, hdom, size);
+		a.free();
+		
+		a = manager.bddRange(hdom, 5, 234565);
+		testScanVar(manager, a, hdom, 234561);
+		a.free();
+	}
+	
+	@Test public void testIthVar2() {
+		int bits = 20;
+		long size = 1 << bits;
+		DomainManager manager = new DomainManager("cudd", 10000, 10000, 
+				bits, new long[] { size, size, size }, null, 1, 1, 1, false);
+		BDDDomain hdom = manager.getHeapDomain(1);
+		
+		long startTime = System.currentTimeMillis();
+		for (int i = 0; i < size; i++) {
+			BDD bdd = hdom.ithVar(i);
+			Assert.assertEquals(i, DomainManager.scanVar(bdd, hdom));
+			bdd.free();
+		}
+		System.out.printf("ithVar - Original: %dms%n", 
+				System.currentTimeMillis() - startTime);
+		
+		startTime = System.currentTimeMillis();
+		for (int i = 0; i < size; i++) {
+			BDD bdd = manager.ithVar(i, hdom);
+			Assert.assertEquals(i, DomainManager.scanVar(bdd, hdom));
+			bdd.free();
+		}
+		System.out.printf("ithVar - New: %dms%n", 
+				System.currentTimeMillis() - startTime);
+		
+	}
+	
 	@Test public void testToString() {
-		VarManager manager = new VarManager("cudd", 10000, 10000, 
+		DomainManager manager = new DomainManager("cudd", 10000, 10000, 
 				4, new long[] { 4, 4, 4 }, null, 1, 1, 1, false);
 		BDD init = manager.initVars();
 		System.out.println(init);
@@ -133,7 +204,7 @@ public class VarManagerTest {
 	}
 	
 	@Test public void testLoad() {
-		VarManager manager = new VarManager("cudd", 10000, 10000, 
+		DomainManager manager = new DomainManager("cudd", 10000, 10000, 
 				4, new long[] { 4, 4, 4 }, null, 1, 1, 1, false);
 	}
 }

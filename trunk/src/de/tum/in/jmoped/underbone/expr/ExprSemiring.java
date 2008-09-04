@@ -1,6 +1,7 @@
-package de.tum.in.jmoped.underbone;
+package de.tum.in.jmoped.underbone.expr;
 
 
+import de.tum.in.jmoped.underbone.NullSemiring;
 import de.tum.in.wpds.Semiring;
 
 /**

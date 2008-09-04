@@ -94,8 +94,7 @@ public class NullSemiring implements Semiring {
 	public void sliceWith(Semiring eqclass, int approach) {
 	}
 
-	public void store() {
-		// TODO Auto-generated method stub
-		
+	public Semiring diff(Semiring arg0) {
+		return this;
 	}
 }

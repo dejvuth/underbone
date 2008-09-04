@@ -11,12 +11,12 @@ import de.tum.in.wpds.TraceNode;
 public class TraceManager {
 
 	private TraceNode[] rawtrace;
-	private VarManager varmanager;
+	private DomainManager varmanager;
 	
 	private BDDVarSet var;
 	private BDDIterator itr;
 	
-	public TraceManager(List<TraceNode> trace, VarManager manager) {
+	public TraceManager(List<TraceNode> trace, DomainManager manager) {
 		
 //		rawtrace = trace.toArray(new TraceNode[trace.size()]);
 //		varmanager = manager;

@@ -1,6 +1,5 @@
 package de.tum.in.jmoped.underbone.expr;
 
-import de.tum.in.jmoped.underbone.ExprType;
 
 /**
  * Value for {@link ExprType#POPPUSH}.
@@ -29,6 +28,7 @@ public class Poppush {
 	}
 	
 	public String toString() {
+//		if (pop == 1 && push == 0) return "POP";
 		return String.format("pop:%d, push:%d", pop, push);
 	}
 }

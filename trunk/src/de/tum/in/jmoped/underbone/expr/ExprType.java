@@ -1,16 +1,6 @@
-package de.tum.in.jmoped.underbone;
+package de.tum.in.jmoped.underbone.expr;
 
-import de.tum.in.jmoped.underbone.expr.Condition;
-import de.tum.in.jmoped.underbone.expr.Dup;
-import de.tum.in.jmoped.underbone.expr.Field;
-import de.tum.in.jmoped.underbone.expr.Invoke;
-import de.tum.in.jmoped.underbone.expr.Jump;
-import de.tum.in.jmoped.underbone.expr.Local;
-import de.tum.in.jmoped.underbone.expr.New;
-import de.tum.in.jmoped.underbone.expr.Newarray;
-import de.tum.in.jmoped.underbone.expr.Poppush;
-import de.tum.in.jmoped.underbone.expr.Return;
-import de.tum.in.jmoped.underbone.expr.Value;
+import de.tum.in.jmoped.underbone.RemoplaError;
 
 /**
  * The expression type. Use in {@link ExprSemiring}.
@@ -36,31 +26,33 @@ public class ExprType {
 	public static final int ARITH = 0;
 	
 	/**
-	 * Loads arary length
+	 * Loads arary length.
 	 * 
+	 * <pre>
 	 * Operand stack:
 	 * 		..., arrayref -&gt; ..., length
+	 * </pre>
 	 */
 	public static final int ARRAYLENGTH = 1;
 	
 	/**
 	 * Loads from array.
-	 * The field <code>value</code> is of type {@link ExprSemiring.CategoryType}.
+	 * The field <code>value</code> is of type {@link Category}.
 	 * 
 	 * <pre>
 	 * Operand Stack:
-	 * 		..., arrayref, index -> ..., value
+	 * 		..., arrayref, index -&gt; ..., value
 	 * </pre>
 	 */
 	public static final int ARRAYLOAD = 2;
 	
 	/**
 	 * Stores into array.
-	 * The field <code>value</code> is of type {@link ExprSemiring.CategoryType}.
+	 * The field <code>value</code> is of type {@link Category}.
 	 * 
 	 * <pre>
 	 * Operand Stack:
-	 * 		..., arrayref, index, value -> ...
+	 * 		..., arrayref, index, value -&gt; ...
 	 * </pre>
 	 */
 	public static final int ARRAYSTORE = 3;
@@ -71,7 +63,7 @@ public class ExprType {
 	 * 
 	 * <pre>
 	 * Operand stack:
-	 * 		..., -> ..., value
+	 * 		... -&gt; ..., value
 	 * </pre>
 	 */
 	public static final int CONSTLOAD = 4;
@@ -82,7 +74,7 @@ public class ExprType {
 	 * 
 	 * <pre>
 	 * Operand stack:
-	 * 		..., value -> ...,
+	 * 		..., value -&gt; ...
 	 * </pre>
 	 */
 	public static final int CONSTSTORE = 5;
@@ -113,7 +105,7 @@ public class ExprType {
 	 * 
 	 * <pre>
 	 * Operand stack:
-	 * 		..., objectref -> ..., value
+	 * 		..., objectref -&gt; ..., value
 	 * </pre>
 	 */
 	public static final int FIELDLOAD = 9;
@@ -124,14 +116,19 @@ public class ExprType {
 	 * 
 	 * <pre>
 	 * Operand stack:
-	 * 		..., objectref, value -> ...,
+	 * 		..., objectref, value -&gt; ...,
 	 * </pre>
 	 */
 	public static final int FIELDSTORE = 10;
 	
 	/**
 	 * Pushes the return value.
-	 * The field <code>value</code> is of type {@link ExprSemiring.CategoryType}.
+	 * The field <code>value</code> is of type {@link Category}.
+	 * 
+	 * <pre>
+	 * Operand stack:
+	 * 		... -&gt; ..., value
+	 * </pre>
 	 */
 	public static final int GETRETURN = 11;
 	
@@ -141,17 +138,17 @@ public class ExprType {
 	 * 
 	 * <pre>
 	 * Operand stack:
-	 * 		..., -> ..., value
+	 * 		... -&gt; ..., value
 	 * </pre>
 	 */
 	public static final int GLOBALLOAD = 12;
 	
-	/**
-	 * Stores constant into global variable.
-	 * The field <code>value</code> is of type {@link Field}.
-	 * The field <code>aux</code> determines the constant.
-	 */
-	public static final int GLOBALPUSH = 13;
+//	/**
+//	 * Stores constant into global variable.
+//	 * The field <code>value</code> is of type {@link Field}.
+//	 * The field <code>aux</code> determines the constant.
+//	 */
+//	public static final int GLOBALPUSH = 13;
 	
 	/**
 	 * Pops to global variable.
@@ -159,15 +156,15 @@ public class ExprType {
 	 * 
 	 * <pre>
 	 * Operand stack:
-	 * 		..., value -> ...,
+	 * 		..., value -&gt; ...,
 	 * </pre>
 	 */
 	public static final int GLOBALSTORE = 14;
 	
-	/**
-	 * Pushes heap element pointed by the top-of-stack.
-	 */
-	public static final int HEAPLOAD = 15;
+//	/**
+//	 * Pushes heap element pointed by the top-of-stack.
+//	 */
+//	public static final int HEAPLOAD = 15;
 	
 	/**
 	 * Checks for heap overflow.
@@ -228,6 +225,11 @@ public class ExprType {
 	/**
 	 * Pushes from a local variable.
 	 * The field <code>value</code> is of type {@link Local}.
+	 * 
+	 * <pre>
+	 * Operand stack:
+	 * 		... -&gt; ..., value
+	 * </pre>
 	 */
 	public static final int LOAD = 25;
 	
@@ -284,24 +286,34 @@ public class ExprType {
 	/**
 	 * Pushes a constant.
 	 * The field <code>value</code> is of type {@link Value}.
+	 * 
+	 * <pre>
+	 * Operand stack:
+	 * 		... -&gt; ..., value
+	 * </pre>
 	 */
 	public static final int PUSH = 35;
 	
 	/**
 	 * Returns from a module.
-	 * The field <code>value</code> is of type {@link Return}
+	 * The field <code>value</code> is of type {@link Return}.
 	 */
 	public static final int RETURN = 36;
 	
 	/**
 	 * Pops and stores in a local variable.
 	 * The field <code>value</code> is of type {@link Local}.
+	 * 
+	 * <pre>
+	 * Operand stack:
+	 * 		..., value -&gt; ...
+	 * </pre>
 	 */
 	public static final int STORE = 37;
 	
 	/**
 	 * Performs unary operation.
-	 * The field <code>value</code> is of type {@link ExprSemiring.UnaryOpType}.
+	 * The field <code>value</code> is of type {@link Unaryop}.
 	 */
 	public static final int UNARYOP = 38;
 	
@@ -335,9 +347,9 @@ public class ExprType {
 		case FIELDSTORE: return "FIELDSTORE";
 		case GETRETURN: return "GETRETURN";
 		case GLOBALLOAD: return "GLOBALLOAD";
-		case GLOBALPUSH: return "GLOBALPUSH";
+//		case GLOBALPUSH: return "GLOBALPUSH";
 		case GLOBALSTORE: return "GLOBALSTORE";
-		case HEAPLOAD: return "HEAPLOAD";
+//		case HEAPLOAD: return "HEAPLOAD";
 		case HEAPOVERFLOW: return "HEAPOVERFLOW";
 		case HEAPRESET: return "HEAPRESET";
 		case HEAPRESTORE: return "HEAPRESTORE";

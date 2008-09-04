@@ -2,8 +2,8 @@ package de.tum.in.jmoped.underbone.expr;
 
 /**
  * Local variable.
- * Value for {@link de.tum.in.jmoped.underbone.ExprType#LOAD} and 
- * {@link de.tum.in.jmoped.underbone.ExprType#STORE}.
+ * Value for {@link de.tum.in.jmoped.underbone.expr.ExprType#LOAD} and 
+ * {@link de.tum.in.jmoped.underbone.expr.ExprType#STORE}.
  */
 public class Local {
 	

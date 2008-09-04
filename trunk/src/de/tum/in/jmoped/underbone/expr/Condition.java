@@ -90,7 +90,7 @@ public class Condition {
 	 * @return the string representing this condition.
 	 */
 	public String toString() {
-		return String.format("%s %s", getTypeString(), value);
+		return String.format("[CONDITION %s %s]", getTypeString(), value);
 	}
 	
 	private String getTypeString() {

@@ -8,8 +8,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.logging.Logger;
 
-import net.sf.javabdd.BDDDomain;
-
 import de.tum.in.wpds.Utils;
 
 public class ExplicitRelation {
@@ -63,7 +61,7 @@ public class ExplicitRelation {
 		// Adds return variable
 		if (g == null)
 			g = new HashSet<Variable>();
-		g.add(new Variable(VariableType.INT, RETVAR, b));
+		g.add(new Variable(Variable.INT, RETVAR, b));
 		
 		int index = 0;
 		globals = new HashMap<String, Variable>(g.size() + 5, 0.95f);
@@ -494,6 +492,6 @@ public class ExplicitRelation {
 	}
 	
 	public static void log(String msg, Object... args) {
-		VarManager.log(msg, args);
+		BDDManager.log(msg, args);
 	}
 }

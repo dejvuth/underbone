@@ -17,6 +17,8 @@ import de.tum.in.jmoped.underbone.expr.Category;
 import de.tum.in.jmoped.underbone.expr.Comp;
 import de.tum.in.jmoped.underbone.expr.Condition;
 import de.tum.in.jmoped.underbone.expr.Dup;
+import de.tum.in.jmoped.underbone.expr.ExprSemiring;
+import de.tum.in.jmoped.underbone.expr.ExprType;
 import de.tum.in.jmoped.underbone.expr.Field;
 import de.tum.in.jmoped.underbone.expr.If;
 import de.tum.in.jmoped.underbone.expr.Inc;
@@ -217,13 +219,14 @@ public class VirtualMachine {
 				
 				case ExprType.ARITH: {
 					Arith arith = (Arith) d.value;
+					int type = arith.getType();
 					boolean two = arith.getCategory() == Category.TWO;
 					Number s0 = frame.pop();
-					if (two) s0 = frame.pop();
+					if (two && type != Arith.SHL && type != Arith.SHR && type != Arith.USHR) 
+						s0 = frame.pop();
 					Number s1 = frame.pop();
 					if (two) s1 = frame.pop();
 					
-					int type = arith.getType();
 					switch (type) {
 						case Arith.ADD: s0 = s1.longValue() + s0.longValue(); break;
 						case Arith.AND: s0 = s1.longValue() & s0.longValue(); break;
@@ -331,7 +334,7 @@ public class VirtualMachine {
 					// Pushes constant
 					Field field = (Field) d.value;
 					frame.push(constants.get(field.getName()));
-					if (field.categoryTwo())
+					if (field.getCategory().two())
 						frame.push(0);
 					break;
 				}
@@ -345,7 +348,7 @@ public class VirtualMachine {
 					
 					// Pops and stores constant
 					Field field = (Field) d.value;
-					if (field.categoryTwo())
+					if (field.getCategory().two())
 						frame.pop();
 					constants.put(field.getName(), frame.pop());
 					break;
@@ -387,7 +390,7 @@ public class VirtualMachine {
 					// Pushes
 					Field field = (Field) d.value;
 					frame.stack.push(heap.get(s0 + field.getId()));
-					if (field.categoryTwo())
+					if (field.getCategory().two())
 						frame.stack.push(0);
 					break;
 				}
@@ -402,7 +405,7 @@ public class VirtualMachine {
 					// Checkes NPE
 					Field field = (Field) d.value;
 					Number s0 = frame.pop();
-					if (field.categoryTwo())
+					if (field.getCategory().two())
 						s0 = frame.pop();
 					int s1 = frame.pop().intValue();
 //					System.out.printf("s1: %d, s0: %d%n", s1, s0.intValue());
@@ -430,16 +433,16 @@ public class VirtualMachine {
 					
 					Field field = (Field) d.value;
 					frame.stack.push(globals.get(field.getName()));
-					if (field.categoryTwo())
+					if (field.getCategory().two())
 						frame.stack.push(0);
 					break;
 				}
 				
-				// Constant to global
-				case ExprType.GLOBALPUSH: {
-					globals.put((String) d.value, (Integer) d.aux);
-					break;
-				}
+//				// Constant to global
+//				case ExprType.GLOBALPUSH: {
+//					globals.put((String) d.value, (Integer) d.aux);
+//					break;
+//				}
 				
 				// Pops to global
 				case ExprType.GLOBALSTORE: {
@@ -451,15 +454,15 @@ public class VirtualMachine {
 					
 					Field field = (Field) d.value;
 					Number value = frame.pop();
-					if (field.categoryTwo()) value = frame.pop();
+					if (field.getCategory().two()) value = frame.pop();
 					globals.put(field.getName(), value);
 					break;
 				}
 				
-				case ExprType.HEAPLOAD: {
-					frame.stack.push(heap.get(frame.stack.pop().intValue()));
-					break;
-				}
+//				case ExprType.HEAPLOAD: {
+//					frame.stack.push(heap.get(frame.stack.pop().intValue()));
+//					break;
+//				}
 				
 				case ExprType.HEAPOVERFLOW: {
 					// Always has enough heap
@@ -765,7 +768,9 @@ public class VirtualMachine {
 					switch (print.type) {
 					case Print.NOTHING: break;
 					case Print.INTEGER: System.out.print(frame.pop().longValue()); break;
+					case Print.LONG: frame.pop(); System.out.print(frame.pop().longValue()); break;
 					case Print.FLOAT: System.out.print(frame.pop().doubleValue()); break;
+					case Print.DOUBLE: frame.pop(); System.out.print(frame.pop().doubleValue()); break;
 					case Print.CHARACTER: System.out.print((char) frame.pop().intValue()); break;
 					case Print.STRING: System.out.print(strings.get(frame.pop().intValue())); break;
 					}
@@ -1038,7 +1043,7 @@ public class VirtualMachine {
 			id = 1;
 			break;
 		case ExprType.FIELDSTORE:
-			id = ((Field) A.value).categoryTwo() ? 3 : 2;
+			id = ((Field) A.value).getCategory().two() ? 3 : 2;
 			break;
 		}
 		

@@ -2,7 +2,6 @@ package de.tum.in.jmoped.underbone.expr;
 
 import java.util.Arrays;
 
-import de.tum.in.jmoped.underbone.ExprType;
 
 /**
  * Value for {@link ExprType#NEWARRAY}.

@@ -1,7 +1,7 @@
 package de.tum.in.jmoped.underbone.expr;
 
 /**
- * Value for {@link de.tum.in.jmoped.underbone.ExprType#INC}.
+ * Value for {@link de.tum.in.jmoped.underbone.expr.ExprType#INC}.
  */
 public class Inc {
 	

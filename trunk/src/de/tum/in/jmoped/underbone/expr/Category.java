@@ -7,37 +7,42 @@ package de.tum.in.jmoped.underbone.expr;
  * @author suwimont
  *
  */
-public enum Category implements Expr {
-
-//	public static final int ZERO = 0;
-//	public static final int ONE = 1;
-//	public static final int TWO = 2;
-//	
-//	public static String toString(int cat) {
-//		return String.format("cat:%d", cat);
-//	}
+public class Category implements Expr {
 	
-	ZERO(0), ONE(1), TWO(2);
+	/**
+	 * Category zero, representing the void return type.
+	 */
+	public static final Category ZERO = new Category(0);
 	
-	private int value;
+	/**
+	 * Category one.
+	 */
+	public static final Category ONE = new Category(1);
 	
-	private Category(int value) {
-		this.value = value;
+	/**
+	 * Category two.
+	 */
+	public static final Category TWO = new Category(2);
+	
+	private int cat;
+	
+	private Category(int cat) {
+		this.cat = cat;
 	}
 	
 	public int intValue() {
-		return value;
+		return cat;
 	}
 	
 	public boolean one() {
-		return value == 1;
+		return cat == 1;
 	}
 	
 	public boolean two() {
-		return value == 2;
+		return cat == 2;
 	}
 	
 	public String toString() {
-		return String.format("category:%d", value);
+		return String.format("category: %d", cat);
 	}
 }
