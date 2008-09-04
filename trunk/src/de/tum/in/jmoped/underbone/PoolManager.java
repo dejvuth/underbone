@@ -143,7 +143,7 @@ public class PoolManager {
 	}
 	
 	BDD ithVar(long value, int[] ivar) {
-		return bddmanager.ithVar(value, ivar);
+		return bddmanager.ithVar(ivar, value);
 	}
 	
 //	static long scanVar(BDD bdd, int[] ivar) {
@@ -196,12 +196,12 @@ public class PoolManager {
 	public BDD bddRange(int[] ivar, int min, int max) {
 		
 		if (min == max)
-			return bddmanager.ithVar(min, ivar);
+			return bddmanager.ithVar(ivar, min);
 		
 		BDD a = bddmanager.getFactory().zero();
 		for (int i = min; i <= max; i++) {
 			long e = encode(i, ivar);
-			a.orWith(bddmanager.ithVar(e, ivar));
+			a.orWith(bddmanager.ithVar(ivar, e));
 		}
 		
 		return a;

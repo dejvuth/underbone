@@ -1159,7 +1159,7 @@ public class DomainSemiring implements Semiring {
 				d.free();
 				
 				// Collects the heap pointer that will exceeds the heap size
-				if (hp + n.size + 1 > manager.getHeapSize()) {
+				if (hp + n.size + 1 > manager.getHeapLength()) {
 					c.orWith(manager.ithVar(hpdom, hp));
 					continue;
 				}
@@ -1199,7 +1199,7 @@ public class DomainSemiring implements Semiring {
 			
 			// Heap requirement exceeds the heap size?
 			int hp = (int) DomainManager.scanVar(d, doms[newarray.dim]);
-			if (hp + require >= manager.getHeapSize()) {
+			if (hp + require >= manager.getHeapLength()) {
 				c.orWith(d);
 			} else {
 				d.free();
@@ -1744,7 +1744,7 @@ public class DomainSemiring implements Semiring {
 			d.free();
 			
 			// Bypasses if the required memory is greater than the heap size
-			if (hp + n.size + 1 > manager.getHeapSize()) {
+			if (hp + n.size + 1 > manager.getHeapLength()) {
 				error("Not enough heap");
 				continue;
 			}
@@ -1820,7 +1820,7 @@ public class DomainSemiring implements Semiring {
 			log("\t\trequire: %d%n", require);
 			
 			int hp = (int) DomainManager.scanVar(d, doms[newarray.dim]);
-			if (hp + require >= manager.getHeapSize()) {
+			if (hp + require >= manager.getHeapLength()) {
 				log("\t\tNot enough heap. hp: %d, require: %d%n", hp, require);
 				continue;
 			}
@@ -2786,12 +2786,12 @@ public class DomainSemiring implements Semiring {
 	}
 
 	/**
-	 * Symbolic:
+	 * Lazy:
 	 * <pre>
 	 * (G0,G3,G1,L1) -> (G3,L0)
 	 * </pre>
 	 * 
-	 * Explicit:
+	 * Eager:
 	 * <pre>
 	 * (G0,L0,G1,L1) -> (L0)
 	 * </pre>
