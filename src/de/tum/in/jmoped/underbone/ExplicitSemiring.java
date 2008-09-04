@@ -21,6 +21,8 @@ import de.tum.in.jmoped.underbone.expr.Category;
 import de.tum.in.jmoped.underbone.expr.Comp;
 import de.tum.in.jmoped.underbone.expr.Condition;
 import de.tum.in.jmoped.underbone.expr.Dup;
+import de.tum.in.jmoped.underbone.expr.ExprSemiring;
+import de.tum.in.jmoped.underbone.expr.ExprType;
 import de.tum.in.jmoped.underbone.expr.Field;
 import de.tum.in.jmoped.underbone.expr.If;
 import de.tum.in.jmoped.underbone.expr.Inc;
@@ -81,6 +83,16 @@ public class ExplicitSemiring implements Semiring {
 //			}
 //		} catch (Throwable t) {}
 		
+		return new ExplicitSemiring(newrels);
+	}
+	
+	public Semiring diff(Semiring a) {
+		HashSet<ExplicitRelation> thatrels = ((ExplicitSemiring) a).rels;
+		if (rels.equals(thatrels))
+			return new ExplicitSemiring(new HashSet<ExplicitRelation>(1));
+		
+		HashSet<ExplicitRelation> newrels = id(rels);
+		newrels.removeAll(thatrels);
 		return new ExplicitSemiring(newrels);
 	}
 
@@ -258,12 +270,12 @@ public class ExplicitSemiring implements Semiring {
 			return getreturn(A);
 		case ExprType.GLOBALLOAD:
 			return globalload(A);
-		case ExprType.GLOBALPUSH:
-			return globalpush(A);
+//		case ExprType.GLOBALPUSH:
+//			return globalpush(A);
 		case ExprType.GLOBALSTORE:
 			return globalstore(A);
-		case ExprType.HEAPLOAD:
-			return heapload(A);
+//		case ExprType.HEAPLOAD:
+//			return heapload(A);
 		case ExprType.HEAPOVERFLOW:
 			return heapoverflow(A);
 		case ExprType.IF:
@@ -317,21 +329,27 @@ public class ExplicitSemiring implements Semiring {
 	
 	private Semiring arith(ExprSemiring A) {
 		Arith arith = (Arith) A.value;
+		int type = arith.getType();
 		int cat = arith.getCategory().intValue();
+		int v1depth = 2*cat;
+		if (cat == 2 && (type == Arith.SHL || type == Arith.SHR || type == Arith.USHR))
+			v1depth++;
+		
+		
 		boolean two = (cat == 2) && arith.getType() != Arith.CMP;
 		
 		HashSet<ExplicitRelation> newrels = new HashSet<ExplicitRelation>();
 		for (ExplicitRelation rel : rels) {
 			int sp = rel.sptr();
-			Number v1 = rel.stack(sp - 2*cat);
-			Number v2 = rel.stack(sp - cat);
+			Number v1 = rel.stack(sp - v1depth);
+			Number v2 = rel.stack(sp - v1depth + cat);
 			
 			// Shortcuts nondeterministic range
 			if (arith.getType() == Arith.NDT) {
 				for (int i = v1.intValue(); i <= v2.intValue(); i++) {
 					ExplicitRelation newrel = rel.id();
-					newrel.setSptr(sp - 2*cat + ((two) ? 2 : 1));
-					newrel.setStack(sp - 2*cat, i);
+					newrel.setSptr(sp - v1depth + ((two) ? 2 : 1));
+					newrel.setStack(sp - v1depth, i);
 					if (cat == 2)
 						newrel.setStack(sp - 3, 0);
 					newrels.add(newrel);
@@ -341,10 +359,10 @@ public class ExplicitSemiring implements Semiring {
 
 			Number r = arith(arith.getType(), v1, v2);
 			ExplicitRelation newrel = rel.id();
-			newrel.setSptr(sp - 2*cat + ((two) ? 2 : 1));
-			newrel.setStack(sp - 2*cat, r);
+			newrel.setSptr(sp - v1depth + ((two) ? 2 : 1));
+			newrel.setStack(sp - v1depth, r);
 			if (two)
-				newrel.setStack(sp - 3, 0);
+				newrel.setStack(sp - v1depth + 1, 0);
 			
 			newrels.add(newrel);
 		}
@@ -577,19 +595,19 @@ public class ExplicitSemiring implements Semiring {
 		return new ExplicitSemiring(newrels);
 	}
 	
-	private Semiring globalpush(ExprSemiring A) {
-		String name = (String) A.value;
-		int value = (Integer) A.aux;
-		
-		HashSet<ExplicitRelation> newrels = new HashSet<ExplicitRelation>();
-		for (ExplicitRelation rel : rels) {
-			ExplicitRelation newrel = rel.id();
-			newrel.setGlobal(name, value);
-			newrels.add(newrel);
-		}
-		
-		return new ExplicitSemiring(newrels);
-	}
+//	private Semiring globalpush(ExprSemiring A) {
+//		String name = (String) A.value;
+//		int value = (Integer) A.aux;
+//		
+//		HashSet<ExplicitRelation> newrels = new HashSet<ExplicitRelation>();
+//		for (ExplicitRelation rel : rels) {
+//			ExplicitRelation newrel = rel.id();
+//			newrel.setGlobal(name, value);
+//			newrels.add(newrel);
+//		}
+//		
+//		return new ExplicitSemiring(newrels);
+//	}
 	
 	private Semiring globalstore(ExprSemiring A) {
 		HashSet<ExplicitRelation> newrels = fulfillsCondition(A);
@@ -608,18 +626,18 @@ public class ExplicitSemiring implements Semiring {
 		return new ExplicitSemiring(newrels);
 	}
 	
-	private Semiring heapload(ExprSemiring A) {
-		HashSet<ExplicitRelation> newrels = new HashSet<ExplicitRelation>();
-		for (ExplicitRelation rel : rels) {
-			int sp = rel.sptr();
-			
-			ExplicitRelation newrel = rel.id();
-			newrel.setStack(sp - 1, rel.heap(rel.stack(sp - 1).intValue()));
-			newrels.add(newrel);
-		}
-		
-		return new ExplicitSemiring(newrels);
-	}
+//	private Semiring heapload(ExprSemiring A) {
+//		HashSet<ExplicitRelation> newrels = new HashSet<ExplicitRelation>();
+//		for (ExplicitRelation rel : rels) {
+//			int sp = rel.sptr();
+//			
+//			ExplicitRelation newrel = rel.id();
+//			newrel.setStack(sp - 1, rel.heap(rel.stack(sp - 1).intValue()));
+//			newrels.add(newrel);
+//		}
+//		
+//		return new ExplicitSemiring(newrels);
+//	}
 	
 	private Semiring heapoverflow(ExprSemiring A) {
 		return new ExplicitSemiring(new HashSet<ExplicitRelation>(1));
@@ -1001,17 +1019,19 @@ public class ExplicitSemiring implements Semiring {
 	
 	private Semiring print(ExprSemiring A) {
 		Print print = (Print) A.value;
+		int type = print.type;
+		int cat = (type == Print.LONG || type == Print.DOUBLE) ? 2 : 1;
 		StringBuilder out = new StringBuilder();
 		
 		HashSet<ExplicitRelation> newrels = new HashSet<ExplicitRelation>();
 		for (ExplicitRelation rel : rels) {
 			ExplicitRelation newrel = rel.id();
-			if (print.type == Print.NOTHING) {
+			if (type == Print.NOTHING) {
 				newrel.setSptr(rel.sptr() - 1);
 			} else {
-				out.append(rel.stack(rel.sptr() - 1));
+				out.append(rel.stack(rel.sptr() - cat));
 				out.append(" ");
-				newrel.setSptr(rel.sptr() - 2);
+				newrel.setSptr(rel.sptr() - cat - 1);
 			}
 			newrels.add(newrel);
 		}
@@ -1239,7 +1259,7 @@ public class ExplicitSemiring implements Semiring {
 			id = 1;
 			break;
 		case ExprType.FIELDSTORE:
-			id = ((Field) A.value).categoryTwo() ? 3 : 2;
+			id = ((Field) A.value).getCategory().two() ? 3 : 2;
 			break;
 		}
 		

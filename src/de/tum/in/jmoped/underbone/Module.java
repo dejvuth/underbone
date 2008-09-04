@@ -9,6 +9,8 @@ import de.tum.in.jmoped.underbone.expr.Category;
 import de.tum.in.jmoped.underbone.expr.Comp;
 import de.tum.in.jmoped.underbone.expr.Condition;
 import de.tum.in.jmoped.underbone.expr.Dup;
+import de.tum.in.jmoped.underbone.expr.ExprSemiring;
+import de.tum.in.jmoped.underbone.expr.ExprType;
 import de.tum.in.jmoped.underbone.expr.Field;
 import de.tum.in.jmoped.underbone.expr.If;
 import de.tum.in.jmoped.underbone.expr.Inc;
@@ -41,15 +43,17 @@ public class Module {
 	 */
 	private String name;
 	
-	/**
-	 * True iff long or double. Length determines the number of parameters.
-	 */
-	private boolean[] params;
+	private int nargs;
 	
-	/**
-	 * True if the method does not return a value.
-	 */
-	private boolean isVoid;
+//	/**
+//	 * True iff long or double. Length determines the number of parameters.
+//	 */
+//	private boolean[] params;
+	
+//	/**
+//	 * True if the method does not return a value.
+//	 */
+//	private boolean isVoid;
 	
 	/**
 	 * Stack depth
@@ -75,12 +79,13 @@ public class Module {
 	 * @param sdepth the operand stack depth.
 	 * @param lvnum the number of local variables.
 	 */
-	public Module (String name, boolean[] params, boolean isVoid, 
+	public Module (String name, int nargs, //boolean[] params, //boolean isVoid, 
 			int sdepth, int lvnum) {
 		
 		this.name = name;
-		this.params = params;
-		this.isVoid = isVoid;
+		this.nargs = nargs;
+//		this.params = params;
+//		this.isVoid = isVoid;
 		this.sdepth = sdepth;
 		this.lvnum = lvnum;
 	}
@@ -330,7 +335,7 @@ public class Module {
 		StringBuilder out = new StringBuilder();
 		
 		Utils.append(out, "module %s %s0(", "void", Remopla.mopedize(name));
-		for (int i = 0; i < params.length; i++) {
+		for (int i = 0; i < nargs; i++) {
 			if (i > 0) out.append(", ");
 			Utils.append(out, "int %s%d", lv, i);
 		}
@@ -358,7 +363,7 @@ public class Module {
 		}
 		
 		// Local vars
-		for (int i = params.length; i < lvnum; i++) {
+		for (int i = nargs; i < lvnum; i++) {
 			Utils.append(out, "int %s%d;%n", lv, i);
 		}
 		Utils.append(out, "%n");
@@ -400,9 +405,9 @@ public class Module {
 			case ExprType.FIELDSTORE: s = fieldstore(itr); toIterate = false; break;
 			case ExprType.GETRETURN : s = getreturn(d); break;
 			case ExprType.GLOBALLOAD: s = globalload(d); break;
-			case ExprType.GLOBALPUSH: s = globalpush(d); break;
+//			case ExprType.GLOBALPUSH: s = globalpush(d); break;
 			case ExprType.GLOBALSTORE: s = globalstore(d); break;
-			case ExprType.HEAPLOAD: s = heapload(); break;
+//			case ExprType.HEAPLOAD: s = heapload(); break;
 			case ExprType.HEAPOVERFLOW: break;
 			case ExprType.IF: s = ifexpr(itr); toIterate = false; break;
 			case ExprType.IFCMP: s = ifcmp(itr); toIterate = false; break;
@@ -686,7 +691,7 @@ public class Module {
 			Field field = (Field) d.value;
 			Utils.append(b, ")) -> %s = %s[%s + %d]", 
 					s0(), heap, s0(), field.getId());
-			if (field.categoryTwo()) {
+			if (field.getCategory().two()) {
 				Utils.append(b, ", %s[%s + 1] = 0, %s = %s + 1", 
 						stack, sptr, sptr, sptr);
 			}
@@ -713,7 +718,7 @@ public class Module {
 			Utils.append(b, "\t:: (%s != 0 && (", s1());
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
 			Field field = (Field) d.value;
-			boolean two = field.categoryTwo();
+			boolean two = field.getCategory().two();
 			b.append(fulfillsCondition((Condition) d.aux, two ? 3 : 2));
 			
 			Utils.append(b, ")) -> %s[%s + %d] = %s, %s = %s - 2;%n", 
@@ -746,7 +751,7 @@ public class Module {
 		Utils.append(b, "\t:: (%s) -> ", fulfillsCondition((Condition) d.aux, 0));
 		Utils.append(b, "%s[%s] = %s", 
 				stack, sptr, Remopla.mopedize(field.getName()));
-		if (field.categoryTwo())
+		if (field.getCategory().two())
 			Utils.append(b, ", %s[%s + 1] = 0", stack, sptr);
 		Utils.append(b, ", %s = %s + %d;%n", 
 				sptr, sptr, field.getCategory().intValue());
@@ -754,10 +759,10 @@ public class Module {
 		return b.toString();
 	}
 	
-	private static String globalpush(ExprSemiring d) {
-		return String.format("%s = %d;", 
-				Remopla.mopedize((String) d.value), (Integer) d.aux);
-	}
+//	private static String globalpush(ExprSemiring d) {
+//		return String.format("%s = %d;", 
+//				Remopla.mopedize((String) d.value), (Integer) d.aux);
+//	}
 	
 	private static String globalstore(ExprSemiring d) {
 		Field field = (Field) d.value;
@@ -771,10 +776,10 @@ public class Module {
 		return b.toString();
 	}
 	
-	private static String heapload() {
-		return String.format("%s[%s] = %s[%s[%s - 1]], %s = %s + 1;", 
-				stack, sptr, heap, stack, sptr, sptr, sptr);
-	}
+//	private static String heapload() {
+//		return String.format("%s[%s] = %s[%s[%s - 1]], %s = %s + 1;", 
+//				stack, sptr, heap, stack, sptr, sptr, sptr);
+//	}
 	
 //	private static String iftype(int type) {
 //		switch (type) {
@@ -1119,8 +1124,12 @@ public class Module {
 	
 	private static String print(ExprSemiring d) {
 		Print print = (Print) d.value;
-		return String.format("%s = %s - %d",
-					sptr, sptr, (print.type == Print.NOTHING) ? 1 : 2);
+		int type = print.type;
+		int pop;
+		if (type == Print.NOTHING) pop = 1;
+		else if (type == Print.LONG || type == Print.DOUBLE) pop = 3;
+		else pop = 2;
+		return String.format("%s = %s - %d", sptr, sptr, pop);
 	}
 	
 	private static String push(ExprSemiring d) {

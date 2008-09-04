@@ -1,6 +1,5 @@
 package de.tum.in.jmoped.underbone.expr;
 
-import de.tum.in.jmoped.underbone.ExprType;
 
 /**
  * New information. Value for {@link ExprType#NEW}.

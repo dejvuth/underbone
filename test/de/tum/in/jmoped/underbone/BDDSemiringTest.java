@@ -1,11 +1,11 @@
 package de.tum.in.jmoped.underbone;
 
-import static de.tum.in.jmoped.underbone.ExprType.ARRAYLOAD;
-import static de.tum.in.jmoped.underbone.ExprType.ARRAYSTORE;
-import static de.tum.in.jmoped.underbone.ExprType.NEWARRAY;
-import static de.tum.in.jmoped.underbone.ExprType.PUSH;
-import static de.tum.in.jmoped.underbone.ExprType.SWAP;
-import static de.tum.in.jmoped.underbone.ExprType.UNARYOP;
+import static de.tum.in.jmoped.underbone.expr.ExprType.ARRAYLOAD;
+import static de.tum.in.jmoped.underbone.expr.ExprType.ARRAYSTORE;
+import static de.tum.in.jmoped.underbone.expr.ExprType.NEWARRAY;
+import static de.tum.in.jmoped.underbone.expr.ExprType.PUSH;
+import static de.tum.in.jmoped.underbone.expr.ExprType.SWAP;
+import static de.tum.in.jmoped.underbone.expr.ExprType.UNARYOP;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -21,6 +21,8 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import de.tum.in.jmoped.underbone.expr.Category;
+import de.tum.in.jmoped.underbone.expr.ExprSemiring;
+import de.tum.in.jmoped.underbone.expr.ExprType;
 import de.tum.in.jmoped.underbone.expr.Invoke;
 import de.tum.in.jmoped.underbone.expr.Local;
 import de.tum.in.jmoped.underbone.expr.Newarray;
@@ -38,9 +40,9 @@ public class BDDSemiringTest {
 	 * 
 	 * @return a variable manager.
 	 */
-	static VarManager init() {
-		VarManager.setVerbosity(2);
-		VarManager manager =  new VarManager("cudd", 10000, 10000, 
+	static DomainManager init() {
+		DomainManager.setVerbosity(2);
+		DomainManager manager =  new DomainManager("cudd", 10000, 10000, 
 				3, new long[] { 8, 8, 8, 8, 8, 8, 8 }, null, 3, 3, 1, false);
 		System.out.printf("Factory used: %s%n", manager.getFactory().getClass().getName());
 		return manager;
@@ -58,7 +60,7 @@ public class BDDSemiringTest {
 	}
 	
 	private BDD peek() {
-		return ((BDDSemiring) stack.peek()).bdd;
+		return ((DomainSemiring) stack.peek()).bdd;
 	}
 	
 	private BDD run(Semiring[] expr) {
@@ -83,7 +85,7 @@ public class BDDSemiringTest {
 		int count = 0;
 		while (itr.hasNext()) {
 			System.out.printf("\t%d:\t", count++);
-			System.out.println(((BDDSemiring) itr.next()).bdd.toStringWithDomains());
+			System.out.println(((DomainSemiring) itr.next()).bdd.toStringWithDomains());
 			System.out.println();
 		}
 	}
@@ -96,9 +98,9 @@ public class BDDSemiringTest {
 	}
 	
 	@Test public void testPush() {
-		VarManager manager = init();
+		DomainManager manager = init();
 		Semiring[] expr = new Semiring[] {
-				new BDDSemiring(manager, manager.initVars()),
+				new DomainSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(Category.ONE, 4)),
 				new ExprSemiring(ExprType.STORE, new Local(Category.ONE, 1))
 		};
@@ -107,9 +109,9 @@ public class BDDSemiringTest {
 	}
 	
 	@Test public void testInvoke() {
-		VarManager manager = init();
+		DomainManager manager = init();
 		Semiring[] expr = new Semiring[] {
-				new BDDSemiring(manager, manager.initVars()),
+				new DomainSemiring(manager, manager.initVars()),
 //				new ExprSemiring(PUSH, new Value(Category.ONE, 4)),
 				new ExprSemiring(ExprType.INVOKE, new Invoke())
 		};
@@ -122,14 +124,14 @@ public class BDDSemiringTest {
 	 */
 	@Test public void testArrayload() {
 		
-		VarManager manager = init();
+		DomainManager manager = init();
 		
 		/*
 		 * Creates a new array with size [0,3] and load the element at index 1.
 		 * Note that there are two array bound violations.
 		 */
 		Semiring[] expr = new Semiring[] {
-				new BDDSemiring(manager, manager.initVars()),
+				new DomainSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(Category.ONE, 0, 1, 3)),
 				new ExprSemiring(NEWARRAY, new Newarray(new Value(Category.ONE,2))),
 				new ExprSemiring(PUSH, new Value(Category.ONE,1)),
@@ -152,14 +154,14 @@ public class BDDSemiringTest {
 	 */
 	@Test public void testArraystore() {
 		
-		VarManager manager = init();
+		DomainManager manager = init();
 		
 		/*
 		 * Creates a new array with size [0,3] and store value 2 at index 1.
 		 * Note that there are two array bound violations.
 		 */
 		Semiring[] expr = new Semiring[] {
-				new BDDSemiring(manager, manager.initVars()),
+				new DomainSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(Category.ONE,0, 1, 3)),
 				new ExprSemiring(NEWARRAY, new Newarray()),
 				new ExprSemiring(PUSH, new Value(Category.ONE,1)),
@@ -182,11 +184,11 @@ public class BDDSemiringTest {
 	 */
 	@Test public void testSwap() {
 		
-		VarManager manager = init();
+		DomainManager manager = init();
 		
 		// Pushes and swaps
 		Semiring[] expr = new Semiring[] {
-				new BDDSemiring(manager, manager.initVars()),
+				new DomainSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(Category.ONE, -1, 1, 1)),
 				new ExprSemiring(PUSH, new Value(Category.ONE, 2, 1, 3)),
 				new ExprSemiring(SWAP)
@@ -213,11 +215,11 @@ public class BDDSemiringTest {
 	 */
 	@Test public void testUnaryopContains() {
 		
-		VarManager manager = init();
+		DomainManager manager = init();
 		
 		// Pushes and checks for containment.
 		Semiring[] expr = new Semiring[] {
-				new BDDSemiring(manager, manager.initVars()),
+				new DomainSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(Category.ONE, 3)),
 				new ExprSemiring(UNARYOP, new Unaryop(Unaryop.Type.CONTAINS, 
 						new HashSet<Integer>(Arrays.asList(1, 3, 4))))
@@ -231,7 +233,7 @@ public class BDDSemiringTest {
 		
 		// Pushes and checks for containment.
 		expr = new Semiring[] {
-				new BDDSemiring(manager, manager.initVars()),
+				new DomainSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(Category.ONE, 2)),
 				new ExprSemiring(UNARYOP, new Unaryop(Unaryop.Type.CONTAINS, 
 						new HashSet<Integer>(Arrays.asList(1, 3, 4))))

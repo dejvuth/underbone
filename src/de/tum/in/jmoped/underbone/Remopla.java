@@ -181,7 +181,7 @@ public class Remopla {
 		/**
 		 * The variable manager
 		 */
-		VarManager manager;
+		DomainManager manager;
 		
 		public BDDDomainCoverage(int nthread, int ncontext, boolean lazy, 
 				String bddpackage, int nodenum, int cachesize) {
@@ -373,7 +373,7 @@ public class Remopla {
 		Set<String> labels = firstpoststar(pds, init);
 		
 		// Creates variable manager
-		c.manager = new VarManager(c.bddpackage, c.nodenum, c.cachesize, 
+		c.manager = new DomainManager(c.bddpackage, c.nodenum, c.cachesize, 
 				bits, heapSizes, globals, smax, lvmax, 1, false);
 		log("manager:%n%s%n", c.manager.toString());
 		
@@ -384,7 +384,7 @@ public class Remopla {
 		
 		// Initializes FA
 		c.fa = new Fa();
-		c.fa.add(new BDDSemiring(c.manager, c.manager.initVars()), p, init, s);
+		c.fa.add(new DomainSemiring(c.manager, c.manager.initVars()), p, init, s);
 		
 		// Second post*
 		Sat sat;
@@ -395,7 +395,7 @@ public class Remopla {
 		} else {
 			Dpn dpn = getDpn();
 			info("DPN contains %d rules%n", dpn.size());
-			Semiring g0 = (c.lazy) ? null : new BDDSemiring(c.manager, c.manager.initSharedVars());
+			Semiring g0 = (c.lazy) ? null : new DomainSemiring(c.manager, c.manager.initSharedVars());
 			sat = new DpnSat(dpn, g0, c.nthread, c.ncontext, c.lazy);
 			sat.setListener(listener);
 			c.reach = (DpnReach) sat.poststar(c.fa, monitor);
@@ -622,7 +622,7 @@ public class Remopla {
 		return c.manager.getFloats();
 	}
 	
-	public VarManager getVarManager() {
+	public DomainManager getVarManager() {
 		if (!coverage.mode.equals(CoverageMode.BDDDOMAIN)) 
 			return null;
 		
@@ -664,13 +664,13 @@ public class Remopla {
 		Fa post = coverage.post;
 		if (post == null) return null;
 		
-		VarManager manager = coverage.manager;
+		DomainManager manager = coverage.manager;
 		Set<Transition> trans = post.getTransitions(p, label);
 		WorkSet<String> workset = new LifoWorkSet<String>();
 		HashMap<String, BDD> rels = new HashMap<String, BDD>();
 		for (Transition t : trans) {
 			workset.add(t.getToState());
-			rels.put(t.getToState(), ((BDDSemiring) post.getWeight(t)).bdd.id());
+			rels.put(t.getToState(), ((DomainSemiring) post.getWeight(t)).bdd.id());
 		}
 		
 		// States that has transitions to the final state.
@@ -696,7 +696,7 @@ public class Remopla {
 				}
 				
 				BDD bdd1 = rels.get(q);
-				BDD bdd2 = ((BDDSemiring) post.getWeight(t)).bdd;
+				BDD bdd2 = ((DomainSemiring) post.getWeight(t)).bdd;
 				BDD bdd = manager.conjoin(bdd1, bdd2);
 				log("bdd1: %s%n", bdd1.toStringWithDomains());
 				log("bdd2: %s%n", bdd2.toStringWithDomains());
@@ -830,7 +830,8 @@ public class Remopla {
 	 */
 	public void free() {
 		modules = null;
-		coverage.free();
+		if (coverage != null)
+			coverage.free();
 	}
 	
 	/**
@@ -840,7 +841,7 @@ public class Remopla {
 	 */
 	public static void setVerbosity(int level) {
 		verbosity = level;
-		VarManager.setVerbosity(level);
+		BDDManager.setVerbosity(level);
 		VirtualMachine.setVerbosity(level);
 	}
 	

@@ -1,11 +1,15 @@
 package de.tum.in.jmoped.underbone.expr;
 
-import de.tum.in.jmoped.underbone.ExprType;
 
 /**
  * Field information.
- * Value for {@link ExprType#GLOBALLOAD}, {@link ExprType#GLOBALSTORE},
- * {@link ExprType#FIELDLOAD}, {@link ExprType#FIELDSTORE}.
+ * 
+ * Value for {@link ExprType#CONSTLOAD}, 
+ * {@link ExprType#CONSTSTORE},
+ * {@link ExprType#GLOBALLOAD}, 
+ * {@link ExprType#GLOBALSTORE},
+ * {@link ExprType#FIELDLOAD}, 
+ * {@link ExprType#FIELDSTORE}.
  *
  */
 public class Field {
@@ -47,25 +51,31 @@ public class Field {
 		this.id = id;
 	}
 	
+	/**
+	 * Gets the computational type category of this field.
+	 * 
+	 * @return the category.
+	 */
 	public Category getCategory() {
 		return category;
 	}
 	
+	/**
+	 * Gets the id of this field.
+	 * 
+	 * @return the id.
+	 */
 	public int getId() {
 		return id;
 	}
 	
+	/**
+	 * Gets the name of this field.
+	 * 
+	 * @return the name.
+	 */
 	public String getName() {
 		return name;
-	}
-	
-	/**
-	 * Returns <code>true</code> if this field type is of category 2.
-	 * 
-	 * @return <code>true</code> if this field type is of category 2.
-	 */
-	public boolean categoryTwo() {
-		return category == Category.TWO;
 	}
 	
 	/**

@@ -1,7 +1,7 @@
 package de.tum.in.jmoped.underbone.expr;
 
 /**
- * Value for {@link de.tum.in.jmoped.underbone.ExprType#JUMP}.
+ * Value for {@link de.tum.in.jmoped.underbone.expr.ExprType#JUMP}.
  */
 public enum Jump {
 	/**

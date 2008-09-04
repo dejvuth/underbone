@@ -75,7 +75,8 @@ public class LabelUtils {
 
 	/**
 	 * Returns the list of parameter types as specified by the 
-	 * <code>descriptor</code>.
+	 * <code>descriptor</code>. The method returns an empty list
+	 * if no parameters.
 	 * 
 	 * @param descriptor the method descriptor.
 	 * @return the list of parameter types.
