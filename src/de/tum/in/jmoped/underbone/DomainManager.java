@@ -15,21 +15,18 @@ import de.tum.in.jmoped.underbone.expr.If;
 
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDDomain;
-import net.sf.javabdd.BDDFactory;
 import net.sf.javabdd.BDDPairing;
 import net.sf.javabdd.BDDVarSet;
 import net.sf.javabdd.BDD.BDDIterator;
 
 /**
- * The <code>VarManager</code> manages variables during the analysis.
+ * The manager that works on the level of BDD domains for managing variables
+ * during the analysis.
  * 
  * @author suwimont
  *
  */
 public class DomainManager extends BDDManager {
-	
-	// Heap size
-	private long[] heapSizes;
 	
 	// Domains of all variables
 	protected BDDDomain[] doms;
@@ -89,7 +86,6 @@ public class DomainManager extends BDDManager {
 			log("bits: %d, heapSizes: %s, g: %s, smax: %s, lvmax: %d, tbound %d%n",
 					bits, Arrays.toString(heapSizes), g, smax, lvmax, tbound);
 		long size = 1 << bits;
-		this.heapSizes = heapSizes;
 		
 		// Prepares array for domains
 		int s = smax + varcopy*lvmax;
@@ -215,9 +211,9 @@ public class DomainManager extends BDDManager {
 		}
 		
 		// Initializes heap
-		if (getHeapSize() > 1) {
+		if (getHeapLength() > 1) {
 			a.andWith(ithVar(doms[hpDomIndex + shifted], 1));
-			for (int i = 0; i < getHeapSize(); i++) {
+			for (int i = 0; i < getHeapLength(); i++) {
 				a.andWith(ithVar(doms[getHeapDomainIndex(i) + shifted], 0));
 			}
 		}
@@ -874,63 +870,6 @@ public class DomainManager extends BDDManager {
 		return set;
 	}
 	
-//	private int nargs;
-//	private BDDDomain[] argDoms;
-//	
-//	public BDD saveArgs(int hp, int nargs) {
-//	
-//		this.nargs = nargs;
-//		if (nargs <= 0) return factory.one();
-//		
-//		long[] domSize = new long[nargs + hp - 1];
-//		int j = 0;
-//		for (int i = 0; i < nargs; i++)
-//			domSize[j++] = size;
-//		for (int i = 1; i < hp; i++)
-//			domSize[j++] = heapSizes[i];
-//		argDoms = factory.extDomain(domSize);
-//		BDD bdd = factory.one();
-//		j = 0;
-//		for (int i = 0; i < nargs; i++)
-//			bdd.andWith(getLocalVarDomain(i).buildEquals(argDoms[j++]));
-//		for (int i = 1; i < hp; i++)
-//			bdd.andWith(getHeapDomain(i).buildEquals(argDoms[j++]));
-//		return bdd;
-//	}
-	
-//	public List<RawArgument> getRawArguments(BDD a) {
-//		
-//		// Abstracts everything else
-//		BDDVarSet abs = factory.emptySet();
-//		for (int i = 0; i < doms.length; i++)
-//			abs.unionWith(doms[i].set());
-//		BDD b = a.exist(abs);
-//		
-//		// Gets iterator
-//		BDDVarSet vs = factory.emptySet();
-//		for (int i = 0; i < argDoms.length; i++)
-//			vs.unionWith(argDoms[i].set());
-//		BDDIterator itr = b.iterator(vs);
-//		
-//		// For each possible argument
-//		List<RawArgument> args = new ArrayList<RawArgument>();
-//		while (itr.hasNext()) {
-//			BDD c = itr.nextBDD();
-//			RawArgument arg = new RawArgument(nargs, argDoms.length - nargs);
-//			for (int i = 0; i < nargs; i++)
-//				arg.lv[i] = decode(c.scanVar(argDoms[i]).longValue(), argDoms[i]);
-//			for (int i = nargs; i < argDoms.length; i++)
-//				arg.heap[i - nargs] = decode(c.scanVar(argDoms[i]).longValue(), argDoms[i]);
-//			log("arg: %s%n", arg);
-//			args.add(arg);
-//			c.free();
-//		}
-//		
-//		vs.free();
-//		b.free();
-//		return args;
-//	}
-	
 	/**
 	 * Signature of a: (G0,L0,G1,L1)
 	 * 
@@ -942,25 +881,23 @@ public class DomainManager extends BDDManager {
 		log("a: %s%n", a.toStringWithDomains());
 		
 		// Abstracts G0 and L0
-//		BDDVarSet abs = getGlobalVarSet().union(getLocalVarSet());
 		BDDVarSet abs = getG0VarSet().union(getLocalVarSet());
 		BDD b = a.exist(abs);
 		abs.free();
 		
 		// Gets iterator
 		BDDIterator itr = b.iterator(getG1L1VarSet());
-//		BDDIterator itr = b.iterator(factory.makeUSet(getG1L1Domain()));
 		
 		// For each possible argument
 		List<RawArgument> args = new ArrayList<RawArgument>();
 		while (itr.hasNext()) {
 			BDD c = itr.nextBDD();
-			RawArgument arg = new RawArgument(lvmax, heapSizes.length - 1);
+			RawArgument arg = new RawArgument(lvmax, getHeapLength() - 1);
 			for (int i = 0; i < lvmax; i++) {
 				BDDDomain dom = doms[l0 + varcopy*i + 1];
 				arg.lv[i] = decode(DomainManager.scanVar(c, dom), dom);
 			}
-			for (int i = 0; i < heapSizes.length - 1; i++) {
+			for (int i = 0; i < getHeapLength() - 1; i++) {
 				BDDDomain dom = doms[hDomIndex + globalcopy*(i+1) + 1];
 				arg.heap[i] = decode(DomainManager.scanVar(c, dom), dom);
 			}
@@ -1007,43 +944,6 @@ public class DomainManager extends BDDManager {
 		return bp;
 	}
 	
-//	private void freeCache() {
-//		if (equals != null) {
-//			for (int i = 0; i < equals.length; i++) {
-//				if (equals[i] == null) continue;
-//				equals[i].free();
-//				equals[i] = null;
-//			}
-//		}
-//		
-//		if (g3g4ordering != null) {
-//			g3g4ordering.free();
-//			g3g4ordering = null;
-//		}
-//		
-//		if (pairings != null) {
-//			for (int i = 0; i < pairings.length; i++) {
-//				if (pairings[i] == null) continue;
-//				pairings[i] = null;
-//			}
-//		}
-//		
-//		if (varsets != null) {
-//			for (int i = 0; i < varsets.length; i++) {
-//				if (varsets[i] == null) continue;
-//				varsets[i].free();
-//				varsets[i] = null;
-//			}
-//		}
-//		
-//		if (varSetWithout != null) {
-//			for (BDDVarSet varset : varSetWithout.values()) {
-//				varset.free();
-//			}
-//			varSetWithout.clear();
-//		}
-//	}
-	
 	/**
 	 * Encodes <code>raw</code> in two-complement format.
 	 * 
@@ -1076,7 +976,7 @@ public class DomainManager extends BDDManager {
 	}
 	
 	public BDD ithVar(BDDDomain dom, long value) {
-		return ithVar(value, dom.vars());
+		return ithVar(dom.vars(), value);
 //		return dom.ithVar(value);
 	}
 	
@@ -1238,11 +1138,11 @@ public class DomainManager extends BDDManager {
 				state.add(toCommaString(gv));
 			}
 			
-			if (getHeapSize() > 1) {
+			if (getHeapLength() > 1) {
 				int ptr = (int) scanVar(b, getHeapPointerDomain());
 				state.add(String.format("ptr: %d", ptr));
 				
-				ArrayList<Integer> heap = new ArrayList<Integer>((int) (1.4*getHeapSize()));
+				ArrayList<Integer> heap = new ArrayList<Integer>((int) (1.4*getHeapLength()));
 				for (int i = 0; i < ptr; i++) {
 					heap.add((int) scanVar(b, getHeapDomain(i)));
 				}
@@ -1675,7 +1575,7 @@ public class DomainManager extends BDDManager {
 	public String toString() {
 		
 		StringBuilder out = new StringBuilder();
-		out.append(String.format("Bits: %d, Heap Size: %d%n", bits, getHeapSize(), g0));
+		out.append(String.format("Bits: %d, Heap Size: %d%n", bits, getHeapLength(), g0));
 		out.append(String.format("g0: %d, gnum: %d, hpDomIndex: %d, hDomIndex: %d%n", g0, gnum, hpDomIndex, hDomIndex));
 		out.append(String.format("l0: %d, lvmax: %d, lvDomIndex: %d%n", l0, lvmax, lvDomIndex));
 		out.append(String.format("smax: %d, spDomIndex, sDomIndex: %d%n", smax, spDomIndex, sDomIndex));

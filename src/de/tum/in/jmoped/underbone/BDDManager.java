@@ -10,9 +10,14 @@ import java.util.logging.Logger;
 import de.tum.in.wpds.Utils;
 
 import net.sf.javabdd.BDD;
-import net.sf.javabdd.BDDDomain;
 import net.sf.javabdd.BDDFactory;
 
+/**
+ * The manager that manipulates BDDs.
+ * 
+ * @author suwimont
+ *
+ */
 public class BDDManager {
 
 	// Integer bits
@@ -71,14 +76,14 @@ public class BDDManager {
 	private static Logger logger = Utils.getLogger(BDDManager.class);
 	
 	/**
-	 * Constructs a variable manager.
+	 * Constructs a BDD manager.
 	 * 
 	 * @param bddpackage the BDD package: "cudd" or "java".
 	 * @param nodenum the estimated number of BDD nodes.
 	 * @param cachesize the cache size.
 	 * @param bits the number of variable bits.
-	 * @param heapSizes the heap sizes.
 	 * @param g the global variables.
+	 * @param heaplength the heap length.
 	 * @param smax the maximum stack depth.
 	 * @param lvmax the maximum number of local variables.
 	 * @param tbound the thread bound.
@@ -122,6 +127,11 @@ public class BDDManager {
 		return bits;
 	}
 	
+	/**
+	 * Returns the maximum positive integer.
+	 * 
+	 * @return the maximum positive integer.
+	 */
 	public int getMaxInt() {
 		return (1 << (bits - 1)) - 1;
 	}
@@ -135,13 +145,13 @@ public class BDDManager {
 		return 1 << bits;
 	}
 	
-	public int getHeapSize() {
+	/**
+	 * Gets the heap length.
+	 * 
+	 * @return the heap length.
+	 */
+	public int getHeapLength() {
 		return heaplength;
-	}
-	
-	public int getGlobalSize() {
-		if (globals == null) return 0;
-		return globals.size();
 	}
 	
 	/**
@@ -164,18 +174,38 @@ public class BDDManager {
 		return factory;
 	}
 	
+	/**
+	 * Gets the maximum number of local variables.
+	 * 
+	 * @return the maximum number of local variables.
+	 */
 	public int getMaxLocalVars() {
 		return lvmax;
 	}
 	
+	/**
+	 * Returns <code>true</code> if multithreading.
+	 * 
+	 * @return <code>true</code> if multithreading.
+	 */
 	public boolean multithreading() {
 		return tbound > 1;
 	}
 	
+	/**
+	 * Gets the maximum number of threads allowed.
+	 * 
+	 * @return the thread bound.
+	 */
 	public int getThreadBound() {
 		return tbound;
 	}
 	
+	/**
+	 * Returns <code>true</code> if lazy splitting.
+	 * 
+	 * @return <code>true</code> if lazy splitting.
+	 */
 	public boolean lazy() {
 		return lazy;
 	}
@@ -297,7 +327,13 @@ public class BDDManager {
 		return strings.get((int) encoded);
 	}
 	
-	protected static class VarScanner {
+	/**
+	 * The variable scanner. Used in {@link BDDManager#scanVar(BDD, int[])}.
+	 * 
+	 * @author suwimont
+	 *
+	 */
+	private static class VarScanner {
 		BDD bdd;
 		int[] ivar;
 		int index = -1;
@@ -340,6 +376,15 @@ public class BDDManager {
 		}
 	}
 	
+	/**
+	 * Scans a value represented by the variables <code>ivar</code>
+	 * from the BDD. A faster substitution of 
+	 * {@link BDD#scanVar(net.sf.javabdd.BDDDomain)}.
+	 * 
+	 * @param bdd the BDD.
+	 * @param ivar the BDD variable indices.
+	 * @return the value.
+	 */
 	public static long scanVar(BDD bdd, int[] ivar) {
         VarScanner scanner = new VarScanner(bdd, ivar);
         long value = 0;
@@ -350,7 +395,15 @@ public class BDDManager {
         return value;
 	}
 	
-	public BDD ithVar(long value, int[] ivar) {
+	/**
+	 * Returns a BDD representing the <code>value</code> 
+	 * with the variables specified by <code>ivar</code>.
+	 * 
+	 * @param value the value.
+	 * @param ivar the BDD variable indices.
+	 * @return the BDD.
+	 */
+	public BDD ithVar(int[] ivar, long value) {
 		int size = 1 << ivar.length;
         if (value < 0 || value >= size) {
             throw new RemoplaError("%d is out of range. ivar: %s.", 

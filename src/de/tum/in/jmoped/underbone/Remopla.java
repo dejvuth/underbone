@@ -374,7 +374,7 @@ public class Remopla {
 		
 		// Creates variable manager
 		c.manager = new DomainManager(c.bddpackage, c.nodenum, c.cachesize, 
-				bits, heapSizes, globals, smax, lvmax, 1, false);
+				bits, heapSizes, globals, smax, lvmax, c.nthread, c.lazy);
 		log("manager:%n%s%n", c.manager.toString());
 		
 		// Initializes listener
