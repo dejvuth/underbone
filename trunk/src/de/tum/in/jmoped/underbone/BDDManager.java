@@ -20,34 +20,64 @@ import net.sf.javabdd.BDDFactory;
  */
 public class BDDManager {
 
-	// Integer bits
+	/**
+	 * The default bits.
+	 */
 	protected int bits;
 	
+	/**
+	 * The heap length.
+	 */
 	protected int heaplength;
 	
+	/**
+	 * The maximum stack depth.
+	 */
 	protected int smax;
 	
+	/**
+	 * The maximum number of local variables.
+	 */
 	protected int lvmax;
 	
+	/**
+	 * The thread bound.
+	 */
 	protected int tbound;
 	
+	/**
+	 * Indicates lazy splitting.
+	 */
 	protected boolean lazy;
 	
-	// BDDFactory
+	/**
+	 * The BDD factory.
+	 */
 	protected BDDFactory factory;
 	
+	/**
+	 * The default number of copies of variables.
+	 */
 	protected static final int varcopy = 3;
 	
+	/**
+	 * The number of copies of globals.
+	 */
 	protected int globalcopy;
 	
+	/**
+	 * Ordering of BDD variables for globals.
+	 */
 	protected int[] gindex;
 	
 	/**
-	 *  Starting domain index of globals.
+	 * Starting domain index of globals.
 	 */
 	protected static final int g0 = 0;
 	
-	// Starting domain index of locals
+	/**
+	 * Starting domain index of locals
+	 */
 	protected int l0;
 	
 	/**
@@ -101,14 +131,16 @@ public class BDDManager {
 		this.lazy = lazy;
 		this.globalcopy = (!multithreading() || !lazy()) ? varcopy : varcopy + 2;
 		
+		// Initializes global ordering
 		if (multithreading() && lazy()) {
 			gindex = new int[] { 0, 3, 4, 1, 2 };
 		} else {
 			gindex = new int[] { 0, 1, 2, 3, 4 };
 		}
 		
+		// Initializes mapping of global variables
 		if (g != null && !g.isEmpty()) {
-			globals = new HashMap<String, Variable>(g.size() + 3, 0.95f);
+			globals = new HashMap<String, Variable>(g.size() + 1, 0.999f);
 			for (Variable v : g) {
 				globals.put(v.name, v);
 			}
@@ -130,7 +162,7 @@ public class BDDManager {
 	/**
 	 * Returns the maximum positive integer.
 	 * 
-	 * @return the maximum positive integer.
+	 * @return 2^(bits - 1) - 1.
 	 */
 	public int getMaxInt() {
 		return (1 << (bits - 1)) - 1;
@@ -265,6 +297,11 @@ public class BDDManager {
 			return (int) encoded;
 		
 		return (int) (encoded - size);
+	}
+	
+	public static long neg(long encoded, long size) {
+		if (encoded == 0) return 0;
+		return size - encoded;
 	}
 	
 	private ArrayList<Float> floats;

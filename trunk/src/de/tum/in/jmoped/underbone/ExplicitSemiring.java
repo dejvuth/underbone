@@ -333,7 +333,7 @@ public class ExplicitSemiring implements Semiring {
 		int cat = arith.getCategory().intValue();
 		int v1depth = 2*cat;
 		if (cat == 2 && (type == Arith.SHL || type == Arith.SHR || type == Arith.USHR))
-			v1depth++;
+			v1depth--;
 		
 		
 		boolean two = (cat == 2) && arith.getType() != Arith.CMP;
@@ -1122,26 +1122,26 @@ public class ExplicitSemiring implements Semiring {
 		Unaryop unaryop = (Unaryop) A.value;
 		
 		// Narrows: D2F, L2I
-		if (unaryop.type == Unaryop.Type.D2F
-				|| unaryop.type == Unaryop.Type.L2I)
+		if (unaryop.type == Unaryop.D2F
+				|| unaryop.type == Unaryop.L2I)
 			return poppush(new ExprSemiring(ExprType.POPPUSH, new Poppush(1, 0)));
 		
 		// Widens: F2D, I2L
-		if (unaryop.type == Unaryop.Type.F2D
-				|| unaryop.type == Unaryop.Type.I2L)
+		if (unaryop.type == Unaryop.F2D
+				|| unaryop.type == Unaryop.I2L)
 			return push(new ExprSemiring(ExprType.PUSH, 
 					new Value(Category.ONE, 0)));
 		
 		HashSet<ExplicitRelation> newrels = new HashSet<ExplicitRelation>();
 		for (ExplicitRelation rel : rels) {
 			int sp = rel.sptr();
-			Number value = rel.stack(sp - unaryop.type.pop.intValue());
+			Number value = rel.stack(sp - unaryop.pop.intValue());
 			Number result = unaryop(unaryop, value);
 			
 			ExplicitRelation newrel = rel.id();
-			newrel.setStack(sp - unaryop.type.pop.intValue(), result);
-			if (unaryop.type.pop != unaryop.type.push) {
-				if (unaryop.type.pop.one()) {	// && unaryop.type.push == 2
+			newrel.setStack(sp - unaryop.pop.intValue(), result);
+			if (unaryop.pop != unaryop.push) {
+				if (unaryop.pop.one()) {	// && unaryop.type.push == 2
 					newrel.setSptr(sp + 1);
 					newrel.setStack(sp, 0);
 				} else {	// unaryop.type.pop == 2 && unaryop.type.push == 1
@@ -1373,23 +1373,23 @@ public class ExplicitSemiring implements Semiring {
 	
 	private static Number unaryop(Unaryop unaryop, Number value) {
 		switch (unaryop.type) {
-		case INEG:
-		case LNEG:
+		case Unaryop.INEG:
+		case Unaryop.LNEG:
 			return -value.longValue();
-		case DNEG:
-		case FNEG:
+		case Unaryop.DNEG:
+		case Unaryop.FNEG:
 			return -value.doubleValue();
-		case D2I:
-		case D2L:
-		case F2I:
-		case F2L:
+		case Unaryop.D2I:
+		case Unaryop.D2L:
+		case Unaryop.F2I:
+		case Unaryop.F2L:
 			return value.longValue();
-		case I2D:
-		case I2F:
-		case L2D:
-		case L2F:
+		case Unaryop.I2D:
+		case Unaryop.I2F:
+		case Unaryop.L2D:
+		case Unaryop.L2F:
 			return value.doubleValue();
-		case CONTAINS:
+		case Unaryop.CONTAINS:
 			return (unaryop.set.contains(value.intValue())) ? 1 : 0;
 		default:
 			throw new IllegalArgumentException("Invalid operation: " + unaryop);

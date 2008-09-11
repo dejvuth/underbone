@@ -188,8 +188,10 @@ public class VirtualMachine {
 			
 			if (monitor.isCanceled()) break;
 			
-			debug("ptr: %d, heap: %s%n", heap.size(), heap);
-			debug("globals: %s%n", globals);
+			if (all()) {
+				debug("ptr: %d, heap: %s%n", heap.size(), heap);
+				debug("globals: %s%n", globals);
+			}
 			debug("frame: %s%n%n", frame);
 			if (listener != null) listener.reach(frame.label);
 			
@@ -655,7 +657,7 @@ public class VirtualMachine {
 				case ExprType.LOAD: {
 					Local local = (Local) d.value;
 					frame.stack.push(frame.lv[local.index]);
-					if (local.category.two())
+					if (local.getCategory().two())
 						frame.stack.push(0);
 					break;
 				}
@@ -813,23 +815,14 @@ public class VirtualMachine {
 						retvar = frame.stack.pop();
 						if (ret.getCategory().two())
 							retvar = frame.stack.pop();
-					} 
-//					else if (ret.type == Return.Type.THROW) {
-//						int ptr = ((Number) frame.stack.peek()).intValue();
-//						int id = heap.get(ptr).intValue();
-//						if (ret.getThrowInfo().set.contains(id)) {
-//							thisrule = false;
-//							break;
-//						}
-//						globals.put(ret.getThrowInfo().var, ptr);
-//					}
+					}
 					frame = frames.pop();
 					break;
 				}
 				
 				case ExprType.STORE: {
 					Local local = (Local) d.value;
-					if (local.category.one()) {
+					if (local.getCategory().one()) {
 						frame.lv[local.index] = frame.pop();
 					}
 					else {
@@ -850,39 +843,39 @@ public class VirtualMachine {
 				case ExprType.UNARYOP: {
 					Unaryop unaryop = (Unaryop) d.value;
 					Number v = frame.pop();
-					if (unaryop.type.pop.two())
+					if (unaryop.pop.two())
 						v = frame.pop();
 					switch (unaryop.type) {
-					case LNEG:	
-					case INEG:
+					case Unaryop.LNEG:	
+					case Unaryop.INEG:
 						v = -v.longValue();
 						break;
-					case DNEG:
-					case FNEG:
+					case Unaryop.DNEG:
+					case Unaryop.FNEG:
 						v = -v.doubleValue();
 						break;
-					case D2I:
-					case D2L:
-					case F2I:
-					case F2L:
-					case L2I:
-					case I2L:
+					case Unaryop.D2I:
+					case Unaryop.D2L:
+					case Unaryop.F2I:
+					case Unaryop.F2L:
+					case Unaryop.L2I:
+					case Unaryop.I2L:
 						v = v.intValue();
 						break;
-					case D2F:
-					case F2D:
-					case I2D:
-					case I2F:
-					case L2D:
-					case L2F:
+					case Unaryop.D2F:
+					case Unaryop.F2D:
+					case Unaryop.I2D:
+					case Unaryop.I2F:
+					case Unaryop.L2D:
+					case Unaryop.L2F:
 						v = v.doubleValue();
 						break;
-					case CONTAINS:
+					case Unaryop.CONTAINS:
 						v = (unaryop.set.contains(v.intValue())) ? 1 : 0;
 						break;
 					}
 					frame.stack.push(v);
-					if (unaryop.type.push.two())
+					if (unaryop.push.two())
 						frame.stack.push(0);
 					break;
 				}
@@ -921,6 +914,8 @@ public class VirtualMachine {
 		if (length > index) return false;
 		
 		debug("\tArrayIndexOutOfBoundException%n");
+		System.err.printf("ArrayIndexOutOfBoundException - length:%d, index:%d%n", 
+				length, index);
 		String ioob = LabelUtils.formatIoobName(label);
 		if (listener != null) listener.reach(ioob);
 		error(ioob, raw, frames);
@@ -934,6 +929,7 @@ public class VirtualMachine {
 		if (ptr != 0) return false;
 		
 		debug("\tNullPointerException%n");
+		System.err.printf("NullPointerException at %s", label);
 		String npe = LabelUtils.formatNpeName(label);
 		if (listener != null) listener.reach(npe);
 		error(npe, raw, frames);
@@ -984,6 +980,10 @@ public class VirtualMachine {
 	 */
 	static void debug(String msg, Object... args) {
 		log(2, msg, args);
+	}
+	
+	private static boolean all() {
+		return verbosity >= 3;
 	}
 	
 	private static void log(int threshold, String msg, Object... args) {

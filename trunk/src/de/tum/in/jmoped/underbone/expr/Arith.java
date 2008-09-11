@@ -32,15 +32,31 @@ public class Arith implements Expr {
 	private int type;
 	private Category category;
 	
+	/**
+	 * Constructs an arithmetic expression.
+	 * 
+	 * @param type the arithmetic type. See the constants defined in this class.
+	 * @param cat the computational type category.
+	 */
 	public Arith(int type, Category cat) {
 		this.type = type;
 		this.category = cat;
 	}
 	
+	/**
+	 * Gets the arithmetic type.
+	 * 
+	 * @return the type.
+	 */
 	public int getType() {
 		return type;
 	}
 	
+	/**
+	 * Gets the computational type category.
+	 * 
+	 * @return the categroy.
+	 */
 	public Category getCategory() {
 		return category;
 	}

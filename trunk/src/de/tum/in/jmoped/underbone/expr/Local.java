@@ -1,19 +1,20 @@
 package de.tum.in.jmoped.underbone.expr;
 
 /**
- * Local variable.
+ * Local variable information.
+ * 
  * Value for {@link de.tum.in.jmoped.underbone.expr.ExprType#LOAD} and 
  * {@link de.tum.in.jmoped.underbone.expr.ExprType#STORE}.
  */
-public class Local {
+public class Local implements Expr {
 	
 	/**
-	 * Category 1 or 2
+	 * Category 1 or 2.
 	 */
-	public Category category;
+	private Category category;
 	
 	/**
-	 * The index
+	 * The index of this local variable.
 	 */
 	public int index;
 	
@@ -28,6 +29,11 @@ public class Local {
 		this.index = index;
 	}
 	
+	/**
+	 * Gets the computational type category of this local.
+	 * 
+	 * @return the category.
+	 */
 	public Category getCategory() {
 		return category;
 	}
