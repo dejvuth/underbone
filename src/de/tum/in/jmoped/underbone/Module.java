@@ -488,8 +488,13 @@ public class Module {
 	
 	private static String arith(ExprSemiring d) {
 		Arith arith = (Arith) d.value;
+		int type = arith.getType();
+		int cat = arith.getCategory().intValue();
+		int v1depth = 2*cat;
+		if (cat == 2 && (type == Arith.SHL || type == Arith.SHR || type == Arith.USHR))
+			v1depth--;
 		String op = null;
-		switch (arith.getType()) {
+		switch (type) {
 		case Arith.ADD: op = "+"; break;
 		case Arith.AND: op = "-"; break;
 		case Arith.CMP:
@@ -515,11 +520,11 @@ public class Module {
 		default:
 			throw new RemoplaError("Cannot Translate floating points into Remopla.");
 		}
-		int cat = arith.getCategory().intValue();
+		
 		return String.format("%s[%s - %d] = %s[%s - %d] %s %s[%s - %d], %s = %s - %d;", 
-				stack, sptr, 2*cat, 
-				stack, sptr, 2*cat, op, stack, sptr, cat, 
-				sptr, sptr, cat);
+				stack, sptr, v1depth, 
+				stack, sptr, v1depth, op, stack, sptr, v1depth - cat, 
+				sptr, sptr, v1depth - cat);
 	}
 	
 	private static String arraylength(String arrayref) {
@@ -932,7 +937,7 @@ public class Module {
 	
 	private static String load(ExprSemiring d) {
 		Local local = (Local) d.value;
-		if (local.category.one())
+		if (local.getCategory().one())
 			return String.format("%s[%s] = %s, %s = %s + 1;", 
 					stack, sptr, lv(local.index), sptr, sptr);
 		else // category 2
@@ -1185,7 +1190,7 @@ public class Module {
 	
 	private static String store(ExprSemiring d) {
 		Local local = (Local) d.value;
-		if (local.category.one())
+		if (local.getCategory().one())
 			return String.format("%s = %s, %s = %s - 1;", 
 					lv(local.index), s0(), sptr, sptr);
 		else // category 2
@@ -1197,34 +1202,34 @@ public class Module {
 	
 	private static String unaryop(ExprSemiring d) {
 		Unaryop unaryop = (Unaryop) d.value;
-		String v = (unaryop.type.pop.one()) ? s0() : s1();
+		String v = (unaryop.pop.one()) ? s0() : s1();
 		StringBuilder b = new StringBuilder();
 		switch (unaryop.type) {
-		case DNEG:
-		case FNEG:
-		case INEG:
-		case LNEG:
+		case Unaryop.DNEG:
+		case Unaryop.FNEG:
+		case Unaryop.INEG:
+		case Unaryop.LNEG:
 			Utils.append(b, "%s = undef", v);
-			if (unaryop.type.push.two())
+			if (unaryop.push.two())
 				Utils.append(b, ", %s = 0", s0());
 			Utils.append(b, ";");
 			break;
-		case D2F:
-		case D2I:
-		case L2F:
-		case L2I:
+		case Unaryop.D2F:
+		case Unaryop.D2I:
+		case Unaryop.L2F:
+		case Unaryop.L2I:
 			Utils.append(b, "%s = %s - 1;", sptr, sptr);
 			break;
-		case F2D:
-		case F2L:
-		case I2D:
-		case I2L:
+		case Unaryop.F2D:
+		case Unaryop.F2L:
+		case Unaryop.I2D:
+		case Unaryop.I2L:
 			Utils.append(b, "%s[%s] = 0, %s = %s + 1;", stack, sptr, sptr, sptr);
 			break;
-		case D2L:
-		case F2I:
-		case I2F:
-		case L2D:
+		case Unaryop.D2L:
+		case Unaryop.F2I:
+		case Unaryop.I2F:
+		case Unaryop.L2D:
 			b.append("skip;");
 			break;
 		default: {	// CONTAINS

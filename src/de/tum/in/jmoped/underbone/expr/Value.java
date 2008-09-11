@@ -2,6 +2,8 @@ package de.tum.in.jmoped.underbone.expr;
 
 
 /**
+ * Value information.
+ * 
  * Value for {@link ExprType#PUSH}
  * and argument of {@link Newarray}.
  * 

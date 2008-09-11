@@ -41,7 +41,7 @@ import de.tum.in.wpds.Sat;
 import de.tum.in.wpds.Semiring;
 
 /**
- * BDD implementation of the <code>Semiring</code> interface.
+ * An implementation of the <code>Semiring</code> interface based on BDD domains.
  * 
  * @author suwimont
  *
@@ -98,66 +98,17 @@ public class DomainSemiring implements Semiring {
 		return new DomainSemiring(manager, newbdd);
 	}
 	
-//	/**
-//	 * Loads the variables specified by <code>vdoms</code> onto the stack
-//	 * of <code>bdd</code>. The first variable from <code>vdoms</code> will
-//	 * be the depth-most element.
-//	 * 
-//	 * @param vdoms the variable domains.
-//	 * @return new BDD where the variables are pushed.
-//	 */
-//	private BDD load(BDD bdd, BDDDomain... vdoms) {
-//		
-////		log("bdd: %s%n", bdd);
-//		/* 
-//		 * Prepares stack domains:
-//		 * index 0 is stack pointer, last index is top of stack
-//		 */ 
-//		BDDDomain[] sdoms = new BDDDomain[vdoms.length + 1];
-//		sdoms[0] = manager.getStackPointerDomain();
-//		int sp = bdd.scanVar(sdoms[0]).intValue();
-//		for (int i = 0; i < vdoms.length; i++)
-//			sdoms[i + 1] = manager.getStackDomain(sp + i);
-//		
-//		// Abstracts stack pointer and stack
-//		BDD c = abstractVars(bdd, sdoms);
-//		
-//		/*
-//		 *  Updates stack pointer and stack:
-//		 *  the depth-most element gets the first variable
-//		 */
-//		c.andWith(sdoms[0].ithVar(sp + vdoms.length));
-//		for (int i = 0; i < vdoms.length; i++) {
-//			if (vdoms[i] == null)	// Pushes dummy zero in case of null
-//				c.andWith(sdoms[i+1].ithVar(0));
-//			else {
-//				BDD eq = manager.bddEquals(sdoms[i + 1], vdoms[i]);
-////				log("eq: %s%n", eq);
-//				c.andWith(eq);
-//			}
-//		}
-//		
-////		log("c: %s%n", c);
-//		return c;
-//	}
-	
-//	private BDD load(BDD bdd, BDDDomain vdom) {
-//		// Gets domains: sp and s[sp]
-//		BDDDomain spdom = manager.getStackPointerDomain();
-//		int sp = bdd.scanVar(spdom).intValue();
-//		BDDDomain s0dom = manager.getStackDomain(sp);
-//		
-//		// Abstracts sp and s[sp]
-//		BDDVarSet abs = spdom.set().unionWith(s0dom.set());
-//		BDD c = bdd.exist(abs);
-//		abs.free();
-//		
-//		// Updates stack pointer and stack
-//		c.andWith(spdom.ithVar(sp + 1));
-//		c.andWith(s0dom.buildEquals(vdom));
-//		return c;
-//	}
-	
+	/**
+	 * Loads the variables specified by <code>vdom1</code> and
+	 * <code>vdom2</code> onto the stack of <code>bdd</code>. 
+	 * <code>vdom1</code> will be the depth-most element.
+	 * 
+	 * @param cat the computational type category.
+	 * @param the BDD.
+	 * @param vdom1 the domain of variable 1.
+	 * @param vdom2 the domain of variable 2.
+	 * @return new BDD where the variables are pushed.
+	 */
 	private BDD load(int cat, BDD bdd, BDDDomain vdom1, BDDDomain vdom2) {
 		// Gets domains: sp, s[sp], and s[sp+1]
 		BDDDomain spdom = manager.getStackPointerDomain();
@@ -182,49 +133,17 @@ public class DomainSemiring implements Semiring {
 		return c;
 	}
 	
-//	/**
-//	 * Stores the values at the top of the stack of <code>bdd</code>
-//	 * to the variables specified by <code>doms</code>.
-//	 * The first variable from <code>doms</code> gets the depth-most element.
-//	 * 
-//	 * @param doms the vairable domains.
-//	 * @return new BDD where the variables get the stack values.
-//	 */
-//	private BDD store(BDD bdd, BDDDomain... vdoms) {
-//		
-//		/* 
-//		 * Prepares stack domains:
-//		 * index 0 is stack pointer, last index is top of stack
-//		 */ 
-//		BDDDomain[] sdoms = new BDDDomain[vdoms.length + 1];
-//		sdoms[0] = manager.getStackPointerDomain();
-//		int sp = bdd.scanVar(sdoms[0]).intValue();
-//		for (int i = 0; i < vdoms.length; i++)
-//			sdoms[i + 1] = manager.getStackDomain(sp - vdoms.length + i);
-//		
-//		// Abstracts local variables
-//		BDD c = abstractVars(bdd, vdoms);
-//		
-//		/*
-//		 *  Copies the stack to variables:
-//		 *  the first variable gets the depth-most element
-//		 */
-//		for (int i = 0; i < vdoms.length; i++) {
-//			// Ignores null domain
-//			if (vdoms[i] == null)
-//				continue;
-//			
-//			c.andWith(manager.bddEquals(sdoms[i + 1], vdoms[i]));
-//		}
-//		
-//		// Abstracts the stack and updates the stack pointer
-//		BDD d = abstractVars(c, sdoms);
-//		c.free();
-//		d.andWith(sdoms[0].ithVar(sp - vdoms.length));
-//		
-//		return d;
-//	}
-	
+	/**
+	 * Stores the values at the top of the stack of <code>bdd</code>
+	 * to the variables specified by <code>vdom1</code> and <code>vdom2</code>.
+	 * <code>vdom1</code> gets the depth-most element.
+	 * 
+	 * @param cat the computational type category.
+	 * @param the BDD.
+	 * @param vdom1 the domain of variable 1.
+	 * @param vdom2 the domain of variable 2.
+	 * @return new BDD where the variables get the stack values.
+	 */
 	private BDD store(int cat, BDD bdd, BDDDomain vdom1, BDDDomain vdom2) {
 		// Gets domains: sp, s[sp-1], and s[sp-2]
 		BDDDomain spdom = manager.getStackPointerDomain();
@@ -461,7 +380,7 @@ public class DomainSemiring implements Semiring {
 		int cat = arith.getCategory().intValue();
 		int v1depth = 2*cat;
 		if (cat == 2 && (type == Arith.SHL || type == Arith.SHR || type == Arith.USHR))
-			v1depth++;
+			v1depth--;
 		BDDDomain v1dom = manager.getStackDomain(sp - v1depth);
 		BDDDomain v2dom = manager.getStackDomain(sp - v1depth + cat);
 		BDDDomain tdom = manager.getTempVarDomain();
@@ -1748,8 +1667,9 @@ public class DomainSemiring implements Semiring {
 				error("Not enough heap");
 				continue;
 			}
-			log("\t\tNew object at heap index: %d (BDD index: %d)%n", 
-					hp, manager.getHeapDomainIndex(hp));
+			if (Sat.debug())
+				log("\t\tNew object at heap index: %d (BDD index: %d)%n", 
+						hp, manager.getHeapDomainIndex(hp));
 			
 //			// Monitor is a shared var
 //			if (manager.multithreading()) {
@@ -2149,59 +2069,7 @@ public class DomainSemiring implements Semiring {
 			BDD d = bdd.id().replaceWith(pair);
 			c = manager.abstractLocals(d);
 			d.free();
-		} 
-//		else {	// Return.Type.THROW
-//			Return.ThrowInfo t = ret.getThrowInfo();
-//			
-//			// Gets the stack pointer
-//			BDDDomain spdom = manager.getStackPointerDomain();
-//			int sp = bdd.scanVar(spdom).intValue();
-//			
-//			// Gets the stack element where the instance is stored
-//			BDDDomain sdom = manager.getStackDomain(sp - 1);
-//			
-//			BDDDomain vdom = manager.getGlobalVarDomain(t.var);
-//			BDD d = abstractVars(bdd, vdom);
-//			
-//			// Loops for all possible instances
-//			BDDIterator sitr = manager.iterator(d, sdom);
-//			c = bdd.getFactory().zero();
-//			while (sitr.hasNext()) {
-//				
-//				// Gets an instance
-//				BDD e = sitr.nextBDD();
-//				long s = e.scanVar(sdom).longValue();
-//				e.free();
-//				
-//				// Gets all possible ids for this instance
-//				BDDDomain hdom = manager.getHeapDomain(s);
-//				e = d.id().andWith(sdom.ithVar(s));
-//				BDDIterator hitr = manager.iterator(e, hdom);
-//				while (hitr.hasNext()) {
-//					
-//					// Gets an id
-//					BDD f = hitr.nextBDD();
-//					int h = f.scanVar(hdom).intValue();
-//					f.free();
-//					
-//					// Bypasses if the id is not contained in the condition value
-//					if (t.set.contains(h)) {
-//						log("\t\tbypassing id %d%n", h);
-//						continue;
-//					}
-//					
-//					// Prunes the bdd for this id
-//					c.orWith(d.id().andWith(sdom.ithVar(s))
-//							.andWith(hdom.ithVar(h))
-//							.andWith(vdom.ithVar(s)));
-//				}
-//				e.free();
-//			}
-//			if (c.isZero())
-//				return new BDDSemiring(manager, c);
-//			
-//		}
-//		log("g1l1_g2l2: %s%n", manager.getG1L1pairG2L2());
+		}
 		c.replaceWith(manager.getG1L1pairG2L2());
 		
 		// Debug: prints ret values
@@ -2255,13 +2123,13 @@ public class DomainSemiring implements Semiring {
 		
 		// Narrows: D2F, L2I
 		Unaryop unaryop = (Unaryop) A.value;
-		if (unaryop.type == Unaryop.Type.D2F
-				|| unaryop.type == Unaryop.Type.L2I)
+		if (unaryop.type == Unaryop.D2F
+				|| unaryop.type == Unaryop.L2I)
 			return poppush(new ExprSemiring(ExprType.POPPUSH, new Poppush(1, 0)));
 		
 		// Widens: F2D, I2L
-		if (unaryop.type == Unaryop.Type.F2D
-				|| unaryop.type == Unaryop.Type.I2L)
+		if (unaryop.type == Unaryop.F2D
+				|| unaryop.type == Unaryop.I2L)
 			return push(new ExprSemiring(ExprType.PUSH, 
 					new Value(Category.ONE, 0)));
 		
@@ -2271,7 +2139,7 @@ public class DomainSemiring implements Semiring {
 		
 		// Gets the stack domains
 		
-		BDDDomain vdom = manager.getStackDomain(sp - unaryop.type.pop.intValue());
+		BDDDomain vdom = manager.getStackDomain(sp - unaryop.pop.intValue());
 		BDDDomain tdom = manager.getTempVarDomain();
 		
 		// Gets all possible s0 values
@@ -2288,27 +2156,27 @@ public class DomainSemiring implements Semiring {
 			
 			long t = -1;
 			switch (unaryop.type) {
-			case INEG:
-			case LNEG:
-				t = manager.neg(v);
+			case Unaryop.INEG:
+			case Unaryop.LNEG:
+				t = DomainManager.neg(v, vdom);//manager.neg(v);
 				break;
-			case DNEG:
-			case FNEG:
+			case Unaryop.DNEG:
+			case Unaryop.FNEG:
 				t = manager.fneg(v, vdom);
 				break;
-			case D2I:
-			case D2L:
-			case F2I:
-			case F2L:
+			case Unaryop.D2I:
+			case Unaryop.D2L:
+			case Unaryop.F2I:
+			case Unaryop.F2L:
 				t = DomainManager.encode((int) manager.decodeFloat(v), vdom);
 				break;
-			case I2D:
-			case I2F:
-			case L2D:
-			case L2F:
+			case Unaryop.I2D:
+			case Unaryop.I2F:
+			case Unaryop.L2D:
+			case Unaryop.L2F:
 				t = manager.encode((float) v, vdom);
 				break;
-			case CONTAINS:
+			case Unaryop.CONTAINS:
 				t = (unaryop.set.contains((int) v)) ? 1 : 0;
 				break;
 			}
@@ -2318,9 +2186,9 @@ public class DomainSemiring implements Semiring {
 		
 		// Abstracts stack
 		BDDVarSet abs = vdom.set();
-		if (unaryop.type.pop != unaryop.type.push) {
+		if (unaryop.pop != unaryop.push) {
 			abs.unionWith(spdom.set());
-			if (unaryop.type.pop.one())	// && unaryop.type.push == 2
+			if (unaryop.pop.one())	// && unaryop.type.push == 2
 				abs.unionWith(manager.getStackDomain(sp).set());
 			else	// unaryop.type.pop == 2 && unaryop.type.push == 1
 				abs.unionWith(manager.getStackDomain(sp - 1).set());
@@ -2331,8 +2199,8 @@ public class DomainSemiring implements Semiring {
 		
 		// Updates stack
 		d.replaceWith(factory.makePair(tdom, vdom));
-		if (unaryop.type.pop != unaryop.type.push) {
-			if (unaryop.type.pop.one()) {	// && unaryop.type.push == 2
+		if (unaryop.pop != unaryop.push) {
+			if (unaryop.pop.one()) {	// && unaryop.type.push == 2
 				d.andWith(manager.ithVar(spdom, sp + 1));
 				d.andWith(manager.ithVar(manager.getStackDomain(sp), 0));
 			} else {	// unaryop.type.pop == 2 && unaryop.type.push == 1

@@ -60,6 +60,8 @@ public class DomainManager extends BDDManager {
 	 * Use for abstracting other variables away. 
 	 */
 	private HashMap<Integer, BDDVarSet> varSetWithout;
+	
+	public static boolean cache = true;
 
 	/**
 	 * Constructs a variable manager.
@@ -78,6 +80,7 @@ public class DomainManager extends BDDManager {
 	public DomainManager(String bddpackage, int nodenum, int cachesize, 
 			int bits, long[] heapSizes, Collection<Variable> g, 
 			int smax, int lvmax, int tbound, boolean lazy) {
+		// Calls super
 		super(bddpackage, nodenum, cachesize, bits, g,
 				(heapSizes == null) ? 0 : heapSizes.length, 
 				smax, lvmax, tbound, lazy);
@@ -98,20 +101,15 @@ public class DomainManager extends BDDManager {
 		s++;	// ret var
 		long[] domSize = new long[s];
 		
-		
 		// Global variables
 		int index = 0;
 		if (g != null && !g.isEmpty()) {
-			
-//			globals = new HashMap<String, Variable>((int) (1.4 * g.size()));
 			for (Variable v : g) {
-				
 				v.setIndex(index);
 				if (log()) log("%s (%d)%n", v.name, v.getIndex());
-				long gsize = (long) Math.pow(2, v.getBits(bits));
+				long gsize = 1 << v.getBits(bits);
 				for (int i = 0; i < globalcopy; i++)
 					domSize[index++] = gsize;
-//				globals.put(v.name, v);
 				gnum++;
 			}
 		}
@@ -324,7 +322,6 @@ public class DomainManager extends BDDManager {
 	 * @return the BDD domain.
 	 */
 	public BDDDomain getGlobalVarDomain(String name) {
-		
 		Variable var = getGlobalVar(name);
 		if (var == null) return null;
 		return doms[var.getIndex()];
@@ -419,11 +416,11 @@ public class DomainManager extends BDDManager {
 	
 	public BDDVarSet getVarSetWithout(int index) {
 		
-		if (varSetWithout == null) 
+		if (cache && varSetWithout == null) 
 			varSetWithout = new HashMap<Integer, BDDVarSet>();
 		
 		// Uses cache
-		if (varSetWithout.containsKey(index))
+		if (cache && varSetWithout.containsKey(index))
 			return varSetWithout.get(index);
 		
 		BDDDomain[] d = new BDDDomain[doms.length - 1];
@@ -431,12 +428,12 @@ public class DomainManager extends BDDManager {
 			if (i != index) {
 				d[j++] = doms[i];
 			}
-				
 		}
 		BDDVarSet varset = factory.makeSet(d);
 		
 		// Caches
-		varSetWithout.put(index, varset);
+		if (cache)
+			varSetWithout.put(index, varset);
 		
 		return varset;
 	}
@@ -966,6 +963,10 @@ public class DomainManager extends BDDManager {
 		return encode(raw, dom.size().intValue());
 	}
 	
+	public static long neg(long encoded, BDDDomain dom) {
+		return neg(encoded, dom.size().longValue());
+	}
+	
 	public static boolean isNeg(long v, BDDDomain dom) {
 		return v > dom.size().longValue()/2 - 1;
 	}
@@ -1058,23 +1059,23 @@ public class DomainManager extends BDDManager {
 		return encode(-f, dom);
 	}
 	
-	/**
-	 * Returns the negation of v in two-complement format.
-	 * For example, if bits = 3, then the following input/output pairs valid:
-	 * 0->0, 1->4, 2->5, 3->6, 4->1 5->2, 6->3, 7->3.
-	 * 
-	 * Note that an overflow occurs when negating the minimum (negative) value.
-	 * In the example, 7(-4) -> 4(-1).
-	 * 
-	 * @param v the value to be negated.
-	 * @return the negation of v.
-	 */
-	public long neg(long v) {
-		if (v == 0) return 0;
-		
-		int maxint = getMaxInt();
-		return (v <= maxint) ? v + maxint : v - maxint;
-	}
+//	/**
+//	 * Returns the negation of v in two-complement format.
+//	 * For example, if bits = 3, then the following input/output pairs valid:
+//	 * 0->0, 1->4, 2->5, 3->6, 4->1 5->2, 6->3, 7->3.
+//	 * 
+//	 * Note that an overflow occurs when negating the minimum (negative) value.
+//	 * In the example, 7(-4) -> 4(-1).
+//	 * 
+//	 * @param v the value to be negated.
+//	 * @return the negation of v.
+//	 */
+//	public long neg(long v) {
+//		if (v == 0) return 0;
+//		
+//		int maxint = getMaxInt();
+//		return (v <= maxint) ? v + maxint : v - maxint;
+//	}
 	
 	private static final int TO_STRING_BOUND = 20;
 	
