@@ -4,9 +4,10 @@ import java.util.Set;
 
 public class If extends Comp {
 
-	public static final int IS = 6;
-	public static final int LG = 7;
-	public static final int NOT = 8;
+	public static final int ID = 6;
+	public static final int IS = 7;
+	public static final int LG = 8;
+	public static final int NOT = 9;
 	
 	private int type;
 	private Object value;
@@ -28,9 +29,9 @@ public class If extends Comp {
 	 * @param value the value.
 	 */
 	public If(int type, int value) {
-		if (type != IS)
+		if (type != ID && type != IS)
 			throw new ExprError("Internal error");
-		this.type = IS;
+		this.type = type;
 		this.value = value;
 	}
 	
@@ -86,6 +87,7 @@ public class If extends Comp {
 		case GE: return "GE";
 		case GT: return "GT";
 		case LE: return "LE";
+		case ID: return "ID";
 		case IS: return "IS";
 		case LG: return "LG";
 		case NOT: return "NOT";

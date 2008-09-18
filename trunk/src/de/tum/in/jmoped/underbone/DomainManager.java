@@ -171,7 +171,7 @@ public class DomainManager extends BDDManager {
 			sDomIndex = index;
 			for (int i = 0; i < smax; i++) {
 				if (log()) log("stack%d (%d)%n", i, index);
-				domSize[index++] = size;
+				domSize[index++] = size;//(cache) ? 32 : size;
 			}
 		} else {
 			spDomIndex = -1;
@@ -344,33 +344,27 @@ public class DomainManager extends BDDManager {
 		return doms[hpDomIndex];
 	}
 	
-	public int getHeapDomainIndex(int index) {
-		
+	private int getHeapDomainIndex(int index) {
 		if (hDomIndex == -1) return -1;
 		return hDomIndex + globalcopy*index;
 	}
 	
-	public int getHeapDomainIndex(long index) {
-		
-		return getHeapDomainIndex((int) index);
-	}
-	
 	/**
-	 * Returns the BDDDomain of the heap at <code>ptr</code>.
+	 * Returns the BDD Domain representing the heap at <code>index</code>.
 	 * 
-	 * @return the BDDDomain of the heap at <code>ptr</code>.
+	 * @return the BDD Domain.
 	 */
 	public BDDDomain getHeapDomain(int index) {
 		return doms[getHeapDomainIndex(index)];
 	}
 	
+	/**
+	 * Returns the BDD Domain representing the heap at <code>index</code>.
+	 * 
+	 * @return the BDD Domain.
+	 */
 	public BDDDomain getHeapDomain(long index) {
-		
 		return getHeapDomain((int) index);
-	}
-	
-	BDDDomain getObjectTypeDomain(long ptr) {
-		return getHeapDomain(ptr);
 	}
 	
 	/**
@@ -380,7 +374,7 @@ public class DomainManager extends BDDManager {
 	 * @return the BDDDomain representing the array length.
 	 */
 	BDDDomain getArrayLengthDomain(long ptr) {
-		return getHeapDomain(ptr + getArrayAuxSize() - 1);
+		return getHeapDomain(decodeHeapIndex((int) ptr) + getArrayAuxSize() - 1);
 	}
 	
 	/**
@@ -391,15 +385,15 @@ public class DomainManager extends BDDManager {
 	 * @return the BDDDomain representing the array element.
 	 */
 	BDDDomain getArrayElementDomain(long ptr, int index) {
-		return getHeapDomain(ptr + getArrayAuxSize() + index);
+		return getHeapDomain(decodeHeapIndex((int) ptr) + getArrayAuxSize() + index);
 	}
 	
 	BDDDomain getOwnerThreadDomain(long ptr) {
-		return getHeapDomain(ptr + 1);
+		return getHeapDomain(decodeHeapIndex((int) ptr) + 1);
 	}
 	
 	BDDDomain getOwnerCounterDomain(long ptr) {
-		return getHeapDomain(ptr + 2);
+		return getHeapDomain(decodeHeapIndex((int) ptr) + 2);
 	}
 	
 	/**
@@ -445,17 +439,17 @@ public class DomainManager extends BDDManager {
 	 * @param indices the indices.
 	 * @return the variable set.
 	 */
-	public BDDVarSet getVarSetWithout(Set<Integer> indices) {
-		
-		BDDDomain[] d = new BDDDomain[doms.length - indices.size()];
-		for (int i = 0, j = 0; i < doms.length; i++) {
-			if (indices.contains(i)) continue;
-			d[j++] = doms[i];
-		}
-		BDDVarSet varset = factory.makeSet(d);
-		
-		return varset;
-	}
+//	public BDDVarSet getVarSetWithout(Set<Integer> indices) {
+//		
+//		BDDDomain[] d = new BDDDomain[doms.length - indices.size()];
+//		for (int i = 0, j = 0; i < doms.length; i++) {
+//			if (indices.contains(i)) continue;
+//			d[j++] = doms[i];
+//		}
+//		BDDVarSet varset = factory.makeSet(d);
+//		
+//		return varset;
+//	}
 	
 	/**
 	 * Creates BDD for If expression.
@@ -488,6 +482,13 @@ public class DomainManager extends BDDManager {
 		case If.LE:
 			return factory.ithVar(sdom.vars()[bits-1])
 					.orWith(ithVar(sdom, 0));
+			
+		case If.ID:
+			int index = findObjectIdIndex(expr.getValue());
+			if (index < 0 || (index > 0 && omap[index] == 0))
+				return factory.zero();
+			else
+				return ithVar(sdom, index);
 			
 		case If.IS:
 			return ithVar(sdom, expr.getValue());
@@ -567,7 +568,6 @@ public class DomainManager extends BDDManager {
             
             for (int i = 1; i < morevars.length; i++)
             	e.andWith(factory.nithVar(morevars[i]));
-            log("e:%s%n", e);
 			return e;
 		}
 		
@@ -819,6 +819,16 @@ public class DomainManager extends BDDManager {
 		return itr;
 	}
 	
+	private BDDVarSet getVarSetWithout(boolean[] without) {
+		BDDVarSet varset = factory.emptySet();
+		for (int i = 0; i < doms.length; i++) {
+			if (without[i])
+				continue;
+			varset.unionWith(doms[i].set());
+		}
+		return varset;
+	}
+	
 	/**
 	 * Gets the BDD iterator from the <code>bdd</code>.
 	 * The iterator contains only the variables specified by <code>doms</code>. 
@@ -831,14 +841,16 @@ public class DomainManager extends BDDManager {
 		
 		// Collects var set and indices from doms
 		BDDVarSet varset = factory.emptySet();
-		Set<Integer> indices = new HashSet<Integer>((int) (1.4*doms.length));
+//		Set<Integer> indices = new HashSet<Integer>((int) (1.4*doms.length));
+		boolean[] without = new boolean[this.doms.length];
 		for (int i = 0; i < doms.length; i++) {
 			varset.unionWith(doms[i].set());
-			indices.add(doms[i].getIndex());
+//			indices.add(doms[i].getIndex());
+			without[doms[i].getIndex()] = true;
 		}
 		
 		// Abstracts and creates iterator
-		BDDVarSet abs = getVarSetWithout(indices);
+		BDDVarSet abs = getVarSetWithout(without);
 		BDDIterator itr = bdd.exist(abs).iterator(varset);
 		abs.free();
 		varset.free();
@@ -1183,7 +1195,9 @@ public class DomainManager extends BDDManager {
 			all.add("toString() bound reached, skipping the rest");
 		}
 		
-		return toString(all, separator);
+		return "hmap: " + Arrays.toString(hmap) + "\n\t\t"
+				+ "omap: " + Arrays.toString(omap) + "\n\t\t"
+				+ toString(all, separator);
 	}
 	
 	public String toString(BDD a, BDD restrictor) {
@@ -1410,7 +1424,7 @@ public class DomainManager extends BDDManager {
 		return getGxVarSet(VARSET_G4, 4);
 	}
 	
-	private BDDVarSet getLocalVarSet() {
+	BDDVarSet getLocalVarSet() {
 		
 		if (varsets != null && varsets[VARSET_L0] != null) 
 			return varsets[VARSET_L0];

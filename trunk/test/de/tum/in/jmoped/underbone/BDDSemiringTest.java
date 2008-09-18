@@ -133,7 +133,7 @@ public class BDDSemiringTest {
 		Semiring[] expr = new Semiring[] {
 				new DomainSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(Category.ONE, 0, 1, 3)),
-				new ExprSemiring(NEWARRAY, new Newarray(new Value(Category.ONE,2))),
+				new ExprSemiring(NEWARRAY, new Newarray(new Value(Category.ONE,2), new int[] {0})),
 				new ExprSemiring(PUSH, new Value(Category.ONE,1)),
 				new ExprSemiring(ARRAYLOAD)
 		};
@@ -163,7 +163,7 @@ public class BDDSemiringTest {
 		Semiring[] expr = new Semiring[] {
 				new DomainSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(Category.ONE,0, 1, 3)),
-				new ExprSemiring(NEWARRAY, new Newarray()),
+				new ExprSemiring(NEWARRAY, new Newarray(new Value(Category.ONE, 0), new int[] {0})),
 				new ExprSemiring(PUSH, new Value(Category.ONE,1)),
 				new ExprSemiring(PUSH, new Value(Category.ONE,2)),
 				new ExprSemiring(ARRAYSTORE)
@@ -221,7 +221,7 @@ public class BDDSemiringTest {
 		Semiring[] expr = new Semiring[] {
 				new DomainSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(Category.ONE, 3)),
-				new ExprSemiring(UNARYOP, new Unaryop(Unaryop.Type.CONTAINS, 
+				new ExprSemiring(UNARYOP, new Unaryop(Unaryop.CONTAINS, 
 						new HashSet<Integer>(Arrays.asList(1, 3, 4))))
 		};
 		BDD bdd = run(expr);
@@ -235,7 +235,7 @@ public class BDDSemiringTest {
 		expr = new Semiring[] {
 				new DomainSemiring(manager, manager.initVars()),
 				new ExprSemiring(PUSH, new Value(Category.ONE, 2)),
-				new ExprSemiring(UNARYOP, new Unaryop(Unaryop.Type.CONTAINS, 
+				new ExprSemiring(UNARYOP, new Unaryop(Unaryop.CONTAINS, 
 						new HashSet<Integer>(Arrays.asList(1, 3, 4))))
 		};
 		bdd = run(expr);

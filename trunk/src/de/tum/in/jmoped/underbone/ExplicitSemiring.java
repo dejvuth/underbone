@@ -824,18 +824,19 @@ public class ExplicitSemiring implements Semiring {
 	
 	private Semiring newarray(ExprSemiring A) {
 		Newarray newarray = (Newarray) A.value;
+		int dim = newarray.getDimension();
 		
 		HashSet<ExplicitRelation> newrels = new HashSet<ExplicitRelation>();
 		for (ExplicitRelation rel : rels) {
 			int sp = rel.sptr();
-			int[] lengths = new int[newarray.dim];
-			for (int i = 0; i < newarray.dim; i++)
+			int[] lengths = new int[dim];
+			for (int i = 0; i < dim; i++)
 				lengths[i] = rel.stack(sp - i - 1).intValue();
 			
 			// Calculates required heap elements
 			int require = 0;
 			int acc = 1;
-			for (int i = newarray.dim - 1; i >= 0; i--) {
+			for (int i = dim - 1; i >= 0; i--) {
 				require += acc * (lengths[i] + ExplicitRelation.getArrayAuxSize());
 				acc *= lengths[i];
 			}
@@ -848,11 +849,11 @@ public class ExplicitSemiring implements Semiring {
 			
 			int ptr = oldptr;
 			Queue<Integer> indices = new LinkedList<Integer>();
-			for (int i = 1; i <= newarray.dim; i++) {
+			for (int i = 1; i <= dim; i++) {
 				
 				// Computes number of blocks
 				int blocknum = 1;
-				for (int j = i; j < newarray.dim; j++) {
+				for (int j = i; j < dim; j++) {
 					blocknum *= lengths[j];
 				}
 				
@@ -865,7 +866,7 @@ public class ExplicitSemiring implements Semiring {
 					indices.offer(ptr);
 					
 					// Fills the array type
-					newrel.setHeap(ptr++, newarray.types[newarray.dim-i]);
+					newrel.setHeap(ptr++, newarray.types[dim-i]);
 					log("\t\tptr: %d%n", ptr);
 					
 					// Updtes ptr wrt. owner & counter
@@ -901,7 +902,7 @@ public class ExplicitSemiring implements Semiring {
 			}
 			
 			else {
-				if (newarray.dim > 1)
+				if (dim > 1)
 					throw new RemoplaError("Nondeterministic multidimensional array not supported.");
 				
 				ptr = oldptr + ExplicitRelation.getArrayAuxSize();
@@ -1344,7 +1345,8 @@ public class ExplicitSemiring implements Semiring {
 			
 		case If.LE:
 			return value <= 0;
-			
+		
+		case If.ID:
 		case If.IS:
 			return value == expr.getValue();
 		}

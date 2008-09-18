@@ -877,7 +877,10 @@ public class Remopla {
 	 * @return the Moped's legal name.
 	 */
 	static String mopedize(String name) {
-		return name.replaceAll("/|\\.|\\[|\\(|\\)|<|>|\\$|#|;", "_");
+		String newname = name.replaceAll("/|\\.|\\[|\\(|\\)|<|>|\\$|#|;", "_");
+//		if (newname.startsWith("_"))
+//			return "X" + newname;
+		return newname;
 	}
 	
 	static final String error = "error";

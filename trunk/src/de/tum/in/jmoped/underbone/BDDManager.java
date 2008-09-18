@@ -58,7 +58,7 @@ public class BDDManager {
 	/**
 	 * The default number of copies of variables.
 	 */
-	protected static final int varcopy = 3;
+	public static int varcopy = 3;
 	
 	/**
 	 * The number of copies of globals.
@@ -84,6 +84,11 @@ public class BDDManager {
 	 * Maps names to global variables
 	 */
 	protected HashMap<String, Variable> globals;
+	
+//	protected int hcount;
+	protected int[] hmap;
+	
+	protected int[] omap;
 	
 	/**
 	 * Records the maximum number of BDD nodes. For statistics purpose.
@@ -130,6 +135,7 @@ public class BDDManager {
 		this.tbound = tbound;
 		this.lazy = lazy;
 		this.globalcopy = (!multithreading() || !lazy()) ? varcopy : varcopy + 2;
+//		System.out.println(globalcopy);
 		
 		// Initializes global ordering
 		if (multithreading() && lazy()) {
@@ -146,8 +152,17 @@ public class BDDManager {
 			}
 		}
 		
+		if (heaplength > 0) {
+//			hcount = 1;
+			hmap = new int[1 << bits];
+			if (hmap.length > 1)
+				hmap[1] = 1;
+			omap = new int[1 << bits];
+		}
+		
 		factory = BDDFactory.init(bddpackage, nodenum, cachesize);
-		info("BDD package: %s%n", factory.getClass().getName());
+		if (info())
+			info("BDD package: %s%n", factory.getClass().getName());
 	}
 	
 	/**
@@ -184,6 +199,81 @@ public class BDDManager {
 	 */
 	public int getHeapLength() {
 		return heaplength;
+	}
+	
+	public int encodeHeapIndex(int hp) {
+		if (hp == 0)
+			return 0;
+		
+		int size = 1 << bits;
+		int index = hp % size;
+		int startindex = index;
+		int h = hmap[index];
+		while (index == 0 || (h != hp && h != 0)) {
+			index = (index + 1) % size;
+			if (startindex == index)
+				throw new RemoplaError("Too many objects for %d bits", bits);
+			h = hmap[index];
+		}
+//		if (log()) log("\t\tencodeHeapIndex(%d) -> %d%n", hp, index);
+		hmap[index] = hp;
+		return index;
+		
+//		int i = hcount++;
+//		hmap[i] = hp;
+//		return i;
+	}
+	
+	public int decodeHeapIndex(int index) {
+		return hmap[index];
+	}
+	
+	public int findObjectIdIndex(int id) {
+		if (id == 0)
+			return 0;
+		
+		int size = 1 << bits;
+		int index = id % size;
+		int startindex = index;
+		int o = omap[index];
+		while ((index == 0) || (o != id && o != 0)) {
+			index = (index + 1) % size;
+			if (startindex == index)
+				return -1;
+			o = omap[index];
+		}
+		return index;
+	}
+	
+	public int encodeObjectId(int id) {
+		int index = findObjectIdIndex(id);
+//		if (log()) log("\t\tencodeObjectId(%d) -> %d%n", id, index);
+		if (index < 0)
+			throw new RemoplaError("Too many object types for %d bits", bits);
+		
+		omap[index] = id;
+		return index;
+		
+		
+//		if (id == 0)
+//			return 0;
+//		
+//		int size = 1 << bits;
+//		int index = id % size;
+//		int startindex = index;
+//		int o = omap[index];
+//		while ((index == 0) || (o != id && o != 0)) {
+//			index = (index + 1) % size;
+//			if (startindex == index)
+//				throw new RemoplaError("Too many object types for %d bits", bits);
+//			o = omap[index];
+//		}
+//		omap[index] = id;
+//		return index;
+	}
+	
+	public int decodeObjectId(int index) {
+		return omap[index];
 	}
 	
 	/**
@@ -485,6 +575,10 @@ public class BDDManager {
 	 */
 	protected static void info(String msg, Object... args) {
 		log(1, msg, args);
+	}
+	
+	protected static boolean info() {
+		return verbosity >= 1;
 	}
 	
 	protected static boolean log() {

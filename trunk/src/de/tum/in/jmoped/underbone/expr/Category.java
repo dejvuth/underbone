@@ -43,6 +43,6 @@ public class Category implements Expr {
 	}
 	
 	public String toString() {
-		return String.format("category: %d", cat);
+		return String.format("category:%d", cat);
 	}
 }

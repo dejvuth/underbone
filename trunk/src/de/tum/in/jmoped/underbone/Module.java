@@ -358,7 +358,7 @@ public class Module {
 		
 		// Operand stack
 		if (sdepth > 0) {
-			Utils.append(out, "int %s[%d];%n", stack, sdepth);
+			Utils.append(out, "int %s[%d];%n", stack, sdepth + 1);
 			Utils.append(out, "int %s;%n", sptr);
 		}
 		
@@ -376,6 +376,7 @@ public class Module {
 		Iterator<Rule> itr = rules.iterator();
 		rule = itr.next();
 		while (rule != null) {
+			try {
 			
 //			System.out.println(rule);
 			
@@ -442,6 +443,15 @@ public class Module {
 			// Iterates if toIterate is true
 			if (toIterate) {
 				rule = (itr.hasNext()) ? itr.next() : null;
+			}
+			
+			} catch (Throwable t) {
+				System.out.println();
+				System.out.println("Error while translating: " + rule);
+				System.out.println("Please submit the error message and the following trace to suwimont@in.tum.de");
+				System.out.println();
+				System.out.println(this);
+				throw new RuntimeException(t);
 			}
 		}
 		
@@ -749,17 +759,29 @@ public class Module {
 		return b.toString();
 	}
 	
-	private static String globalload(ExprSemiring d) {
-		Field field = (Field) d.value;
+	private static String globalload(Field field) {
 		StringBuilder b = new StringBuilder();
-		Utils.append(b, "if%n");
-		Utils.append(b, "\t:: (%s) -> ", fulfillsCondition((Condition) d.aux, 0));
 		Utils.append(b, "%s[%s] = %s", 
 				stack, sptr, Remopla.mopedize(field.getName()));
 		if (field.getCategory().two())
 			Utils.append(b, ", %s[%s + 1] = 0", stack, sptr);
-		Utils.append(b, ", %s = %s + %d;%n", 
+		Utils.append(b, ", %s = %s + %d;", 
 				sptr, sptr, field.getCategory().intValue());
+		return b.toString();
+	}
+	
+	private static String globalload(ExprSemiring d) {
+		Field field = (Field) d.value;
+		StringBuilder b = new StringBuilder();
+		Utils.append(b, "if%n");
+		Utils.append(b, "\t:: (%s) -> %s%n", 
+				fulfillsCondition((Condition) d.aux, 0), globalload(field));
+//		Utils.append(b, "%s[%s] = %s", 
+//				stack, sptr, Remopla.mopedize(field.getName()));
+//		if (field.getCategory().two())
+//			Utils.append(b, ", %s[%s + 1] = 0", stack, sptr);
+//		Utils.append(b, ", %s = %s + %d;%n", 
+//				sptr, sptr, field.getCategory().intValue());
 		Utils.append(b, "fi;");
 		return b.toString();
 	}
@@ -769,14 +791,23 @@ public class Module {
 //				Remopla.mopedize((String) d.value), (Integer) d.aux);
 //	}
 	
+	private static String globalstore(Field field) {
+		StringBuilder b = new StringBuilder();
+		Utils.append(b, "%s = %s[%s - %d], %s = %s - %d;", 
+				Remopla.mopedize(field.getName()), stack, sptr, field.getCategory().intValue(), 
+				sptr, sptr, field.getCategory().intValue());
+		return b.toString();
+	}
+	
 	private static String globalstore(ExprSemiring d) {
 		Field field = (Field) d.value;
 		StringBuilder b = new StringBuilder();
 		Utils.append(b, "if%n");
-		Utils.append(b, "\t:: (%s) -> ", fulfillsCondition((Condition) d.aux, 0));
-		Utils.append(b, "%s = %s[%s - %d], %s = %s - %d;%n", 
-				Remopla.mopedize(field.getName()), stack, sptr, field.getCategory().intValue(), 
-				sptr, sptr, field.getCategory().intValue());
+		Utils.append(b, "\t:: (%s) -> %s%n", 
+				fulfillsCondition((Condition) d.aux, 0), globalstore(field));
+//		Utils.append(b, "%s = %s[%s - %d], %s = %s - %d;%n", 
+//				Remopla.mopedize(field.getName()), stack, sptr, field.getCategory().intValue(), 
+//				sptr, sptr, field.getCategory().intValue());
 		Utils.append(b, "fi;");
 		return b.toString();
 	}
@@ -802,7 +833,9 @@ public class Module {
 	private static String ifexpr(If expr) {
 		
 		switch (expr.getType()) {
-		case If.IS: return String.format("%s == %d", s0(), expr.getValue());
+		case If.ID:
+		case If.IS: 
+			return String.format("%s == %d", s0(), expr.getValue());
 		case If.LG: return String.format("%s < %d || %s > %d", 
 				s0(), expr.getLowValue(), s0(), expr.getHighValue());
 		case If.NOT: {
@@ -875,30 +908,36 @@ public class Module {
 		Utils.append(b, "if%n");
 		do {
 			ExprSemiring d = (ExprSemiring) rule.getWeight();
-			Invoke invoke = (Invoke) d.value;
-			int nargs = invoke.nargs;
-			
-			// NPE
-			if (!npeprinted && !invoke.isStatic) {
-				Utils.append(b, npe(s(nargs)));
-				npeprinted = true;
+			if (d.value instanceof Jump) {
+				b.append("\t:: (");
+				b.append(fulfillsCondition((Condition) d.aux, 0));
+				Utils.append(b, ") -> goto %s;%n", rule.getRightLabel());
+			} else {
+				Invoke invoke = (Invoke) d.value;
+				int nargs = invoke.nargs;
+				
+				// NPE
+				if (!npeprinted && !invoke.isStatic) {
+					Utils.append(b, npe(s(nargs)));
+					npeprinted = true;
+				}
+				
+				Utils.append(b, "\t:: (");
+				if (!invoke.isStatic)
+					Utils.append(b, "%s != 0 && (", s(nargs));
+				b.append(fulfillsCondition((Condition) d.aux, nargs));
+				if (!invoke.isStatic)
+					b.append(')');
+				Utils.append(b, ") -> %s(", Remopla.mopedize(rule.getRightLabel()));
+				for (int i = 0; i < nargs; i++) {
+					if (i > 0) b.append(", ");
+					b.append(s(nargs - i));
+				}
+				b.append(")");
+				if (nargs > 0)
+					Utils.append(b, ", %s = %s - %d", sptr, sptr, nargs);
+				b.append(";%n");
 			}
-			
-			Utils.append(b, "\t:: (");
-			if (!invoke.isStatic)
-				Utils.append(b, "%s != 0 && (", s(nargs));
-			b.append(fulfillsCondition((Condition) d.aux, nargs));
-			if (!invoke.isStatic)
-				b.append(')');
-			Utils.append(b, ") -> %s(", Remopla.mopedize(rule.getRightLabel()));
-			for (int i = 0; i < nargs; i++) {
-				if (i > 0) b.append(", ");
-				b.append(s(nargs - i));
-			}
-			b.append(")");
-			if (nargs > 0)
-				Utils.append(b, ", %s = %s - %d", sptr, sptr, nargs);
-			b.append(";%n");
 			
 			// Next rule
 			if (itr.hasNext()) rule = itr.next();
@@ -915,15 +954,16 @@ public class Module {
 				Field f = (Field) d.value;
 				if (!f.getName().equals(Remopla.e)) {
 					Utils.append(b, "\t\t%s%n", 
-							(d.type == ExprType.GLOBALLOAD) ? globalload(d) : globalstore(d));
+							(d.type == ExprType.GLOBALLOAD) ? globalload(f) : globalstore(f));
 					
 					// Next rule guarantees to be either globalload or globalstore
 					rule = itr.next();
 					d = (ExprSemiring) rule.getWeight();
+					f = (Field) d.value;
 					Utils.append(b, "\t:: (");
 					b.append(fulfillsCondition((Condition) d.aux, 0));
-					Utils.append(b, ") -> %s%n;", 
-							(d.type == ExprType.GLOBALLOAD) ? globalload(d) : globalstore(d));
+					Utils.append(b, ") -> %s%n", 
+							(d.type == ExprType.GLOBALLOAD) ? globalload(f) : globalstore(f));
 					
 					// Next rule
 					rule = itr.next();
@@ -995,7 +1035,8 @@ public class Module {
 	
 	private static String newarray(ExprSemiring d, int heapsize) {
 		Newarray newarray = (Newarray) d.value;
-		if (newarray.dim > 1)
+		int dim = newarray.getDimension();
+		if (dim > 1)
 			throw new RemoplaError("Multi-dimensional arrays not supported");
 		
 		StringBuilder b = new StringBuilder();
@@ -1048,34 +1089,42 @@ public class Module {
 		String label = rule.getLabel();
 		do {
 			ExprSemiring expr = (ExprSemiring) rule.getWeight();
-//			if (expr.type == ExprType.RETURN) {	// Throw
-//				throwExpr(b, (ExprSemiring.Return) expr.value);
-//				continue;
-//			} else {	// expr.type == ExprType.ONE
-				Jump type = (Jump) expr.value;
-				Condition c = (Condition) expr.aux;
-				boolean contains = (c == null) 
-					? false 
-					: (c.getType() == Condition.CONTAINS);
-				if (contains && !npeprinted) {
-					npe(s0());
-					npeprinted = true;
-				}
-				
-				Utils.append(b, "\t:: (");
-				if (contains)
-					Utils.append(b, "%s != 0 && (", s0());
-				b.append(fulfillsCondition(c, 1));
-				if (contains)
-					b.append(')');
-				Utils.append(b, ") -> goto %s",
+			Condition c = (Condition) expr.aux;
+			boolean contains = (c == null) 
+				? false 
+				: (c.getType() == Condition.CONTAINS);
+			if (contains && !npeprinted) {
+				npe(s0());
+				npeprinted = true;
+			}
+			
+			Utils.append(b, "\t:: (");
+			if (contains)
+				Utils.append(b, "%s != 0 && (", s0());
+			b.append(fulfillsCondition(c, 1));
+			if (contains)
+				b.append(')');
+			Utils.append(b, ") -> ");
+			if (expr.type == ExprType.JUMP) {
+				Utils.append(b, "goto %s",
 						Remopla.mopedize(rule.getRightLabel()));
 				if (expr.type == ExprType.JUMP && ((Jump) expr.value) == Jump.THROW) {
 					Utils.append(b, ", %s[0] = %s[%s - 1], %s = 1, %s = 0", 
 							stack, stack, sptr, sptr, Remopla.e);
 				}
-				Utils.append(b, ";%n");
-//			}
+			} else {
+				Invoke invoke = (Invoke) expr.value;
+				int nargs = invoke.nargs;
+				Utils.append(b, "%s(", Remopla.mopedize(rule.getRightLabel()));
+				for (int i = 0; i < nargs; i++) {
+					if (i > 0) b.append(", ");
+					b.append(s(nargs - i));
+				}
+				b.append(")");
+				if (nargs > 0)
+					Utils.append(b, ", %s = %s - %d", sptr, sptr, nargs);
+			}
+			Utils.append(b, ";%n");
 
 			// Next rule
 			if (itr.hasNext()) rule = itr.next();
