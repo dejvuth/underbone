@@ -503,7 +503,9 @@ public class VirtualMachine {
 						case If.GE: if (i < 0) thisrule = false; break;
 						case If.GT: if (i <= 0) thisrule = false; break;
 						case If.LE: if (i > 0) thisrule = false; break;
-						case If.IS: if (i != expr.getValue()) thisrule = false; break;
+						case If.ID:
+						case If.IS: 
+							if (i != expr.getValue()) thisrule = false; break;
 						case If.LG: 
 							if (i >= expr.getLowValue() && i <= expr.getHighValue()) 
 								thisrule = false; 
@@ -691,26 +693,27 @@ public class VirtualMachine {
 				case ExprType.NEWARRAY: {
 					// Pops the dimensions
 					Newarray newarray = (Newarray) d.value;
-					int[] s = new int[newarray.dim];
-					for (int i = 0; i < newarray.dim; i++) {
+					int dim = newarray.getDimension();
+					int[] s = new int[dim];
+					for (int i = 0; i < dim; i++) {
 						s[i] = frame.pop().intValue();
 					}
 					
 					// Computes heap requirement
 					int require = 0;
 					int acc = 1;
-					for (int i = newarray.dim - 1; i >= 0; i--) {
+					for (int i = dim - 1; i >= 0; i--) {
 						require += acc * (s[i] + 1);
 						acc *= s[i];
 					}
 					debug("\t\trequire: %d%n", require);
 					
 					Queue<Integer> indices = new LinkedList<Integer>();
-					for (int i = 1; i <= newarray.dim; i++) {
+					for (int i = 1; i <= dim; i++) {
 						
 						// Computes number of blocks
 						int blocknum = 1;
-						for (int j = i; j < newarray.dim; j++) {
+						for (int j = i; j < dim; j++) {
 							blocknum *= s[j];
 						}
 						
@@ -723,7 +726,7 @@ public class VirtualMachine {
 							indices.offer(heap.size());
 							
 							// Fills the array type
-							heap.add(newarray.types[newarray.dim-i]);
+							heap.add(newarray.types[dim-i]);
 							
 							// Fills the array length
 							heap.add(blocksize);

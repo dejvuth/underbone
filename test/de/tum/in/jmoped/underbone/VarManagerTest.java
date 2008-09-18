@@ -185,7 +185,7 @@ public class VarManagerTest {
 		
 		startTime = System.currentTimeMillis();
 		for (int i = 0; i < size; i++) {
-			BDD bdd = manager.ithVar(i, hdom);
+			BDD bdd = manager.ithVar(hdom, i);
 			Assert.assertEquals(i, DomainManager.scanVar(bdd, hdom));
 			bdd.free();
 		}

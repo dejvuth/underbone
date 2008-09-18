@@ -183,7 +183,7 @@ public class DomainSemiring implements Semiring {
 	}
 	
 	private void log(BDD bdd) {
-		if (Sat.debug())
+		if (debug())
 			log("%n\t\t%s%n%n", manager.toString(bdd, "\n\t\t"));
 	}
 	
@@ -356,7 +356,7 @@ public class DomainSemiring implements Semiring {
 		if (elapsed > 2000)
 			Sat.info("%d - %s%n", elapsed, A.toString());
 		
-		if (Sat.debug())
+		if (debug())
 			log("\t\textend %d nodes%n", b.bdd.nodeCount());
 		
 		return b;
@@ -851,9 +851,9 @@ public class DomainSemiring implements Semiring {
 		c = bdd.getFactory().zero();
 		while (s0itr.hasNext()) {
 			
-			// Gets the heap domain at s0 + i
+			// Gets the heap domain at s0
 			BDD e = s0itr.nextBDD();
-			long s0 = DomainManager.scanVar(e, s0dom);
+			int s0 = (int) DomainManager.scanVar(e, s0dom);
 			e.free();
 			
 			// NPE
@@ -864,7 +864,7 @@ public class DomainSemiring implements Semiring {
 			
 			// Gets all possible heap value wrt. to s0
 			BDD d = bdd.id().andWith(manager.ithVar(s0dom, s0));
-			BDDDomain hdom = manager.getHeapDomain(s0 + field.getId());
+			BDDDomain hdom = manager.getHeapDomain(manager.decodeHeapIndex(s0) + field.getId());
 			BDDIterator hitr = manager.iterator(d, hdom);
 			while (hitr.hasNext()) {
 				
@@ -942,12 +942,18 @@ public class DomainSemiring implements Semiring {
 			
 			// Gets a reference
 			BDD e = ritr.nextBDD();
-			long r = DomainManager.scanVar(e, rdom);
+			int r = (int) DomainManager.scanVar(e, rdom);
 			e.free();
+			
+			// NPE
+			if (r == 0) {
+				log("\t\tNullPointerException%n");
+				continue;
+			}
 			
 			// Gets the heap domain at referece + id
 			BDD d = bdd.id().andWith(manager.ithVar(rdom, r));
-			BDDDomain hdom = manager.getHeapDomain(r + field.getId());
+			BDDDomain hdom = manager.getHeapDomain(manager.decodeHeapIndex(r) + field.getId());
 			
 			// Gets all possible values wrt. the references
 			BDDIterator vitr = manager.iterator(d, vdom);
@@ -956,7 +962,8 @@ public class DomainSemiring implements Semiring {
 				// Gets a value
 				e = vitr.nextBDD();
 				long v = DomainManager.scanVar(e, vdom);
-				log("\t\tref: %d, value:%d%n", r, v);
+				if (debug())
+					log("\t\tref: %d, value:%d%n", manager.decodeHeapIndex(r), v);
 				e.free();
 				
 				// Prunes the bdd to only for s0 and s1
@@ -968,6 +975,12 @@ public class DomainSemiring implements Semiring {
 				e.free();
 			}
 			d.free();
+		}
+		
+		// NPE
+		if (c.isZero()) {
+			log("\t\tZero BDD%n");
+			return new DomainSemiring(manager, c);
 		}
 		
 		// Abstracts stack
@@ -1079,6 +1092,8 @@ public class DomainSemiring implements Semiring {
 				
 				// Collects the heap pointer that will exceeds the heap size
 				if (hp + n.size + 1 > manager.getHeapLength()) {
+					System.err.printf("Not enough heap: at least %d blocks required.%n", 
+							hp + n.size + 1);
 					c.orWith(manager.ithVar(hpdom, hp));
 					continue;
 				}
@@ -1093,12 +1108,13 @@ public class DomainSemiring implements Semiring {
 		BDDDomain spdom = manager.getStackPointerDomain();
 		int sp = (int) DomainManager.scanVar(bdd, spdom);
 		Newarray newarray = (Newarray) A.aux;
+		int dim = newarray.getDimension();
 		
 		// doms[i] is domain of s_i, doms[newarray.dim] is domain of hp
-		BDDDomain[] doms = new BDDDomain[newarray.dim + 1];
-		for (int i = 0; i < newarray.dim; i++)
+		BDDDomain[] doms = new BDDDomain[dim + 1];
+		for (int i = 0; i < dim; i++)
 			doms[i] = manager.getStackDomain(sp - i - 1);
-		doms[newarray.dim] = manager.getHeapPointerDomain();
+		doms[dim] = manager.getHeapPointerDomain();
 		
 		BDDIterator itr = manager.iterator(bdd, doms);
 		BDD c = bdd.getFactory().zero();
@@ -1108,7 +1124,7 @@ public class DomainSemiring implements Semiring {
 			BDD d = itr.nextBDD();
 			int require = 0;
 			int acc = 1;
-			for (int i = newarray.dim - 1; i >= 0; i--) {
+			for (int i = dim - 1; i >= 0; i--) {
 				int length_i = (int) DomainManager.scanVar(d, doms[i]);
 				log("\t\tlength_i: %d%n", length_i);
 				require += acc * (length_i + manager.getArrayAuxSize());
@@ -1117,8 +1133,10 @@ public class DomainSemiring implements Semiring {
 			log("\t\trequire: %d%n", require);
 			
 			// Heap requirement exceeds the heap size?
-			int hp = (int) DomainManager.scanVar(d, doms[newarray.dim]);
-			if (hp + require >= manager.getHeapLength()) {
+			int hp = (int) DomainManager.scanVar(d, doms[dim]);
+			if (hp + require > manager.getHeapLength()) {
+				System.err.printf("Not enough heap: at least %d blocks required.%n", 
+						hp + require);
 				c.orWith(d);
 			} else {
 				d.free();
@@ -1502,13 +1520,14 @@ public class DomainSemiring implements Semiring {
 				// Gets a s0 value
 				BDD d = sitr.nextBDD();
 				long s = DomainManager.scanVar(d, sdom);
+				int decs = manager.decodeHeapIndex((int) s);
 				d.free();
 				
 				// Gets all possible thread ids wrt. s0
-				BDDDomain thdom = manager.getHeapDomain(s + 1);
-				BDDDomain cntdom = manager.getHeapDomain(s + 2);
+				BDDDomain thdom = manager.getHeapDomain(decs + 1);
+				BDDDomain cntdom = manager.getHeapDomain(decs + 2);
 				log("\t\ts: %d, thdom: %d, cntdom: %d%n", 
-						s, thdom.getIndex(), cntdom.getIndex());
+						decs, thdom.getIndex(), cntdom.getIndex());
 				d = bdd.id().andWith(manager.ithVar(sdom, s));
 				
 				c.orWith(monitorenter(d, thdom, cntdom));
@@ -1550,11 +1569,12 @@ public class DomainSemiring implements Semiring {
 			// Gets a s0 value
 			BDD d = s0itr.nextBDD();
 			long s0 = DomainManager.scanVar(d, s0dom);
+			int decs0 = manager.decodeHeapIndex((int) s0);
 			d.free();
 			
 			// Gets all possible thread ids wrt. to s0
-			BDDDomain thdom = manager.getHeapDomain(s0 + 1);
-			BDDDomain cntdom = manager.getHeapDomain(s0 + 2);
+			BDDDomain thdom = manager.getHeapDomain(decs0 + 1);
+			BDDDomain cntdom = manager.getHeapDomain(decs0 + 2);
 			d = bdd.id().andWith(manager.ithVar(s0dom, s0));
 			BDDIterator thitr = manager.iterator(d, thdom);
 			while (thitr.hasNext()) {
@@ -1578,7 +1598,7 @@ public class DomainSemiring implements Semiring {
 					BDD f = cntitr.nextBDD();
 					int cnt = (int) DomainManager.scanVar(f, cntdom);
 					f.free();
-					log("\t\ts0: %d, th: %d, cnt: %d%n", s0, th, cnt);
+					log("\t\ts0: %d, th: %d, cnt: %d%n", decs0, th, cnt);
 					
 					/*
 					 * Continues if the monitor was not entered.
@@ -1648,54 +1668,65 @@ public class DomainSemiring implements Semiring {
 		
 		// New info
 		New n = (New) A.value;
-		if (n.id >= manager.size()) {
-			String msg = String.format("Not enough bits.%n%n" +
-					"Reason: found class id %d.", n.id);
-			throw new RemoplaError(msg);
-		}
+//		if (n.id >= manager.size()) {
+//			String msg = String.format("Not enough bits.%n%n" +
+//					"Reason: found class id %d.", n.id);
+//			throw new RemoplaError(msg);
+//		}
 		
 		c = bdd.getFactory().zero();
 		while (hpitr.hasNext()) {
 			
 			// Gets a heap pointer value
 			BDD d = hpitr.nextBDD();
-			long hp = DomainManager.scanVar(d, hpdom);
+			int hp = (int) DomainManager.scanVar(d, hpdom);
 			d.free();
 			
 			// Bypasses if the required memory is greater than the heap size
-			if (hp + n.size + 1 > manager.getHeapLength()) {
+			int dechp = manager.decodeHeapIndex(hp);
+			if (dechp + n.size + 1 > manager.getHeapLength()) {
 				error("Not enough heap");
 				continue;
 			}
+			
+			// Gets the heap domain at hp
+			BDDDomain hdom = manager.getHeapDomain(dechp);
 			if (Sat.debug())
 				log("\t\tNew object at heap index: %d (BDD index: %d)%n", 
-						hp, manager.getHeapDomainIndex(hp));
-			
-//			// Monitor is a shared var
-//			if (manager.multithreading()) {
-//				manager.addSharedDom(manager.getHeapDomainIndex(hp + 1));
-//				manager.addSharedDom(manager.getHeapDomainIndex(hp + 2));
-//			}
+						dechp, hdom.getIndex());
 			
 			/*
 			 * Stores class id to where the heap pointer points to, 
 			 * pushes heap pointer, and
 			 * temp gets the updated value of heap pointer
 			 */
-			BDDDomain hdom = manager.getHeapDomain(hp);
 			d = bdd.id().andWith(manager.ithVar(hpdom, hp));
 			BDDVarSet abs = hdom.set().unionWith(s0dom.set());
-			c.orWith(d.exist(abs)
-					.andWith(manager.ithVar(hdom, n.id))
+			
+			logRaw(d.exist(abs));
+			logRaw(d.exist(abs)
+					.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id))));
+			logRaw(d.exist(abs)
+					.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id)))
+					.andWith(manager.ithVar(s0dom, hp)));
+			logRaw(d.exist(abs)
+					.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id)))
 					.andWith(manager.ithVar(s0dom, hp))
-					.andWith(manager.ithVar(tdom, hp + n.size + 1)));
+					.andWith(manager.ithVar(tdom, manager.encodeHeapIndex(dechp + n.size + 1))));
+			
+			c.orWith(d.exist(abs)
+					.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id)))
+					.andWith(manager.ithVar(s0dom, hp))
+					.andWith(manager.ithVar(tdom, manager.encodeHeapIndex(dechp + n.size + 1))));
 			d.free();
 			abs.free();
 		}
 		
 		// If the heap was full
-		if (c.isZero())
+		if (c.isZero()) {
+			log("\t\tZERO%n");
 			return new DomainSemiring(manager, c);
+		}
 		
 		// Abstracts stack pointer and heap pointer
 		BDDVarSet abs = spdom.set().unionWith(hpdom.set());
@@ -1716,12 +1747,13 @@ public class DomainSemiring implements Semiring {
 		BDDDomain spdom = manager.getStackPointerDomain();
 		int sp = (int) DomainManager.scanVar(bdd, spdom);
 		Newarray newarray = (Newarray) A.value;
+		int dim = newarray.getDimension();
 		
 		// doms[i] is domain of s_i, doms[newarray.dim] is domain of hp
-		BDDDomain[] doms = new BDDDomain[newarray.dim + 1];
-		for (int i = 0; i < newarray.dim; i++)
+		BDDDomain[] doms = new BDDDomain[dim + 1];
+		for (int i = 0; i < dim; i++)
 			doms[i] = manager.getStackDomain(sp - i - 1);
-		doms[newarray.dim] = manager.getHeapPointerDomain();
+		doms[dim] = manager.getHeapPointerDomain();
 		
 		BDDIterator itr = manager.iterator(bdd, doms);
 		BDD c = bdd.getFactory().zero();
@@ -1731,7 +1763,7 @@ public class DomainSemiring implements Semiring {
 			BDD d = itr.nextBDD();
 			int require = 0;
 			int acc = 1;
-			for (int i = newarray.dim - 1; i >= 0; i--) {
+			for (int i = dim - 1; i >= 0; i--) {
 				int length_i = (int) DomainManager.scanVar(d, doms[i]);
 				log("\t\tlength_i: %d%n", length_i);
 				require += acc * (length_i + manager.getArrayAuxSize());
@@ -1739,28 +1771,29 @@ public class DomainSemiring implements Semiring {
 			}
 			log("\t\trequire: %d%n", require);
 			
-			int hp = (int) DomainManager.scanVar(d, doms[newarray.dim]);
-			if (hp + require >= manager.getHeapLength()) {
-				log("\t\tNot enough heap. hp: %d, require: %d%n", hp, require);
+			int hp = (int) DomainManager.scanVar(d, doms[dim]);
+			int dechp = manager.decodeHeapIndex(hp);
+			if (dechp + require > manager.getHeapLength()) {
+				log("\t\tNot enough heap. hp: %d, require: %d%n", dechp, require);
 				continue;
 			}
 			
 			// Abstracts heap: heap[hp], ..., heap[hp + require - 1]
 			BDDVarSet abs = bdd.getFactory().emptySet();
 			for (int i = 0; i < require; i++)
-				abs.unionWith(manager.getHeapDomain(hp + i).set());
+				abs.unionWith(manager.getHeapDomain(dechp + i).set());
 			BDD f = bdd.and(d);
 			BDD e = f.exist(abs);
 			f.free();
 			abs.free();
 			
-			int ptr = hp;
+			int ptr = dechp;
 			Queue<Integer> indices = new LinkedList<Integer>();
-			for (int i = 1; i <= newarray.dim; i++) {
+			for (int i = 1; i <= dim; i++) {
 				
 				// Computes number of blocks
 				int blocknum = 1;
-				for (int j = i; j < newarray.dim; j++) {
+				for (int j = i; j < dim; j++) {
 					blocknum *= (int) DomainManager.scanVar(d, doms[j]);
 				}
 				
@@ -1777,12 +1810,12 @@ public class DomainSemiring implements Semiring {
 					indices.offer(ptr);
 					
 					// Fills the array type
-					if (newarray.types[newarray.dim-i] >= manager.size())
-						throw new RemoplaError("Not enough bits. " +
-								"There are at least %d object types.", 
-								newarray.types[newarray.dim-i]);
+//					if (newarray.types[newarray.dim-i] >= manager.size())
+//						throw new RemoplaError("Not enough bits. " +
+//								"There are at least %d object types.", 
+//								newarray.types[newarray.dim-i]);
 					BDDDomain hdom = manager.getHeapDomain(ptr++);
-					e.andWith(manager.ithVar(hdom, newarray.types[newarray.dim-i]));
+					e.andWith(manager.ithVar(hdom, manager.encodeObjectId(newarray.types[dim-i])));
 					log("\t\tptr: %d%n", ptr);
 					
 					// Updtes ptr wrt. owner & counter
@@ -1805,7 +1838,7 @@ public class DomainSemiring implements Semiring {
 						// Initializes the array indices
 						else {
 							int index = indices.remove();
-							value = manager.ithVar(hdom, index);
+							value = manager.ithVar(hdom, manager.encodeHeapIndex(index));
 						}
 						e.andWith(value);
 					}
@@ -1814,15 +1847,15 @@ public class DomainSemiring implements Semiring {
 			
 			// Updates the stack and the hp
 			c.orWith(abstractVars(e, doms)
-					.andWith(manager.ithVar(doms[newarray.dim - 1], indices.remove()))
-					.andWith(manager.ithVar(doms[newarray.dim], hp + require)));
+					.andWith(manager.ithVar(doms[dim - 1], manager.encodeHeapIndex(indices.remove())))
+					.andWith(manager.ithVar(doms[dim], manager.encodeHeapIndex(dechp + require))));
 			e.free();
 			d.free();
 		}
 		
 		// Updates stack pointer
 		BDDVarSet abs = spdom.set();
-		BDD d = c.exist(abs).andWith(manager.ithVar(spdom, sp - newarray.dim  + 1));
+		BDD d = c.exist(abs).andWith(manager.ithVar(spdom, sp - dim  + 1));
 		c.free();
 		abs.free();
 		return new DomainSemiring(manager, d);
@@ -2055,7 +2088,11 @@ public class DomainSemiring implements Semiring {
 		BDD c;
 		Return ret = (Return) A.value;
 		if (ret.type == Return.Type.VOID) {
-			c = manager.abstractLocals(bdd);
+			/*
+			 *  Abstracts locals and the return var (the return var might be
+			 *  set here if this is in fact an exception throwing).
+			 */
+			c = bdd.exist(manager.getLocalVarSet().id().unionWith(manager.getRetVarDomain().set()));
 		} else {	// if (ret.type == Return.Type.SOMETHING) {
 			// Gets the pointer to the stack element
 			BDDDomain spdom = manager.getStackPointerDomain();
@@ -2177,7 +2214,7 @@ public class DomainSemiring implements Semiring {
 				t = manager.encode((float) v, vdom);
 				break;
 			case Unaryop.CONTAINS:
-				t = (unaryop.set.contains((int) v)) ? 1 : 0;
+				t = (unaryop.set.contains(manager.decodeObjectId((int) v))) ? 1 : 0;
 				break;
 			}
 			c.orWith(manager.ithVar(tdom, t).andWith(manager.ithVar(vdom, v)));
@@ -2472,11 +2509,11 @@ public class DomainSemiring implements Semiring {
 				
 				// Gets an instance
 				BDD e = sitr.nextBDD();
-				long s = DomainManager.scanVar(e, sdom);
+				int s = (int) DomainManager.scanVar(e, sdom);
 				e.free();
 				
 				// Gets all possible ids for this instance
-				BDDDomain hdom = manager.getHeapDomain(s);
+				BDDDomain hdom = manager.getHeapDomain(manager.decodeHeapIndex(s));
 				e = bdd.id().andWith(manager.ithVar(sdom, s));
 				BDDIterator hitr = manager.iterator(e, hdom);
 				while (hitr.hasNext()) {
@@ -2484,21 +2521,21 @@ public class DomainSemiring implements Semiring {
 					// Gets an id
 					BDD f = hitr.nextBDD();
 					int h = (int) DomainManager.scanVar(f, hdom);
+					int dech = manager.decodeObjectId(h);
 					f.free();
 					
 					// Bypasses if the id is not contained in the condition value
-					if (type == Condition.CONTAINS && !set.contains(h)) {
-						log("\t\tbypassing id %d%n", h);
+					if (type == Condition.CONTAINS && !set.contains(dech)) {
+						log("\t\tbypassing id %d%n", dech);
 						continue;
 					}
-					if (type == Condition.NOTCONTAINS && set.contains(h)) {
-						log("\t\tbypassing id %d%n", h);
+					if (type == Condition.NOTCONTAINS && set.contains(dech)) {
+						log("\t\tbypassing id %d%n", dech);
 						continue;
 					}
 					
 					// Prunes the bdd for this id
-					d.orWith(bdd.id().andWith(manager.ithVar(sdom, s))
-							.andWith(manager.ithVar(hdom, h)));
+					d.orWith(e.id().andWith(manager.ithVar(hdom, h)));
 				}
 				e.free();
 			}
@@ -2617,13 +2654,17 @@ public class DomainSemiring implements Semiring {
 		return new DomainSemiring(manager, d);
 	}
 	
+	private static boolean debug() {
+		return Sat.debug();
+	}
+	
 	public static void log(String msg, Object... args) {
 		Sat.logger.fine(String.format(msg, args));
 	}
 	
-	public static void error(String msg) {
-		System.err.println(msg);
-		log("\t\t" + msg + "%n");
+	public static void error(String msg, Object... args) {
+		System.err.printf(msg, args);
+		log("\t\t" + msg + "%n", args);
 	}
 	
 	public Semiring id() {

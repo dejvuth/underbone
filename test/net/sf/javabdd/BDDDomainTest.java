@@ -61,10 +61,10 @@ public class BDDDomainTest {
 		BDD a = dom.ithVar(0);
 		Assert.assertEquals(1, setOf(a, dom).size());
 		Assert.assertTrue(setOf(a, dom).contains(0));
-		Assert.assertEquals(1, doms[0].usedbits);
+//		Assert.assertEquals(1, doms[0].usedbits);
 		
 		BDD b = dom.ithVar(1);
-		Assert.assertEquals(1, doms[0].usedbits);
+//		Assert.assertEquals(1, doms[0].usedbits);
 		
 		BDD c = dom.ithVar(2);
 		System.out.println(setOf(a, dom));
@@ -72,10 +72,10 @@ public class BDDDomainTest {
 		Assert.assertTrue(setOf(a, dom).contains(0));
 		Assert.assertEquals(1, setOf(c, dom).size());
 		Assert.assertTrue(setOf(c, dom).contains(2));
-		Assert.assertEquals(2, doms[0].usedbits);
+//		Assert.assertEquals(2, doms[0].usedbits);
 		
 		BDD d = dom.ithVar(3);
-		Assert.assertEquals(2, doms[0].usedbits);
+//		Assert.assertEquals(2, doms[0].usedbits);
 		
 //		doms[0].extendCapacity(4);
 //		Assert.assertEquals(4, doms[0].ithVar(4).scanVar(doms[0]).intValue());
