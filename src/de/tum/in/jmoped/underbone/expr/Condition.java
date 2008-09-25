@@ -103,4 +103,21 @@ public class Condition {
 		
 		throw new ExprError("Unknown condition: " + type);
 	}
+	
+	public int hashCode() {
+		int hash = 31*7 + type;
+		if (value != null) hash = 31*hash + value.hashCode();
+		return hash;
+	}
+	
+	public boolean equals(Object o) {
+		if (o == null) return false;
+		if (!(o instanceof Condition)) return false;
+		
+		Condition that = (Condition) o;
+		if (type != that.type) return false;
+		if (value == null)
+			return that.value == null;
+		return value.equals(that.value);
+	}
 }

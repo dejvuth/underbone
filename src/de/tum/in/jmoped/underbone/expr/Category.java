@@ -42,6 +42,18 @@ public class Category implements Expr {
 		return cat == 2;
 	}
 	
+	public int hashCode() {
+		return 31*7 + cat;
+	}
+	
+	public boolean equals(Object o) {
+		if (o == null) return false;
+		if (!(o instanceof Category)) return false;
+		
+		Category that = (Category) o;
+		return cat == that.cat;
+	}
+	
 	public String toString() {
 		return String.format("category:%d", cat);
 	}

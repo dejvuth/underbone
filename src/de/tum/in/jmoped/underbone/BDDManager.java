@@ -581,7 +581,7 @@ public class BDDManager {
 		return verbosity >= 1;
 	}
 	
-	protected static boolean log() {
+	protected static boolean debug() {
 		return verbosity >= 2;
 	}
 	

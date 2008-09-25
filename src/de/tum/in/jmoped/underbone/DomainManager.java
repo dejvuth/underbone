@@ -85,7 +85,7 @@ public class DomainManager extends BDDManager {
 				(heapSizes == null) ? 0 : heapSizes.length, 
 				smax, lvmax, tbound, lazy);
 		
-		if (log())
+		if (debug())
 			log("bits: %d, heapSizes: %s, g: %s, smax: %s, lvmax: %d, tbound %d%n",
 					bits, Arrays.toString(heapSizes), g, smax, lvmax, tbound);
 		long size = 1 << bits;
@@ -106,7 +106,7 @@ public class DomainManager extends BDDManager {
 		if (g != null && !g.isEmpty()) {
 			for (Variable v : g) {
 				v.setIndex(index);
-				if (log()) log("%s (%d)%n", v.name, v.getIndex());
+				if (debug()) log("%s (%d)%n", v.name, v.getIndex());
 				long gsize = 1 << v.getBits(bits);
 				for (int i = 0; i < globalcopy; i++)
 					domSize[index++] = gsize;
@@ -119,14 +119,14 @@ public class DomainManager extends BDDManager {
 			
 			// Heap pointer
 			hpDomIndex = index;
-			if (log()) log("heap pointer (%d)%n", index);
+			if (debug()) log("heap pointer (%d)%n", index);
 			for (int i = 0; i < globalcopy; i++)
 				domSize[index++] = size;
 			gnum++;
 			
 			// Heap: at zero
 			hDomIndex = index;
-			if (log()) log("heap[0] (%d)%n", index);
+			if (debug()) log("heap[0] (%d)%n", index);
 			for (int j = 0; j < globalcopy; j++)
 				domSize[index++] = 2;
 			gnum++;
@@ -134,7 +134,7 @@ public class DomainManager extends BDDManager {
 			// Heap: the rest
 			for (int i = 1; i < heaplength; i++) {
 				
-				if (log()) log("heap[%d] - index: %d, size: %d%n", i, index, heapSizes[i]);
+				if (debug()) log("heap[%d] - index: %d, size: %d%n", i, index, heapSizes[i]);
 				for (int j = 0; j < globalcopy; j++)
 					domSize[index++] = heapSizes[i];
 				gnum++;
@@ -151,7 +151,7 @@ public class DomainManager extends BDDManager {
 			
 			lvDomIndex = index;
 			for (int i = 0; i < lvmax; i++) {
-				if (log()) log("lv%d (%d)%n", i, index);
+				if (debug()) log("lv%d (%d)%n", i, index);
 				for (int j = 0; j < varcopy; j++)
 					domSize[index++] = size;
 			}
@@ -163,14 +163,14 @@ public class DomainManager extends BDDManager {
 		if (smax > 0) {
 			
 			// Stack pointer
-			if (log()) log("stack pointer (%d)%n", index);
+			if (debug()) log("stack pointer (%d)%n", index);
 			spDomIndex = index;
 			domSize[index++] = smax + 1;
 			
 			// Stack element
 			sDomIndex = index;
 			for (int i = 0; i < smax; i++) {
-				if (log()) log("stack%d (%d)%n", i, index);
+				if (debug()) log("stack%d (%d)%n", i, index);
 				domSize[index++] = size;//(cache) ? 32 : size;
 			}
 		} else {
@@ -185,7 +185,7 @@ public class DomainManager extends BDDManager {
 		// Constructs domains
 		doms = factory.extDomain(domSize);
 		
-		if (log()) {
+		if (debug()) {
 			log("%n");
 			for (int i = 0; i < doms.length; i++)
 				log("doms[%d]:%s%n", i, Arrays.toString(doms[i].vars()));
@@ -879,15 +879,36 @@ public class DomainManager extends BDDManager {
 		return set;
 	}
 	
+	public int countRawArguments(BDD a) {
+		// Abstracts G0 and L0
+		BDDVarSet abs = getG0VarSet().union(getLocalVarSet());
+		BDD b = a.exist(abs);
+		abs.free();
+		
+		// Gets iterator
+		BDDIterator itr = b.iterator(getG1L1VarSet());
+		
+		// For each possible argument
+		int count = 0;
+		while (itr.hasNext()) {
+			BDD c = itr.nextBDD();
+			count++;
+			c.free();
+		}
+		
+		b.free();
+		return count;
+	}
+	
 	/**
 	 * Signature of a: (G0,L0,G1,L1)
 	 * 
 	 * @param a
 	 * @return
 	 */
-	public List<RawArgument> getRawArguments2(BDD a) {
+	public List<RawArgument> getRawArguments(BDD a) {
 		
-		log("a: %s%n", a.toStringWithDomains());
+		if (debug()) log("a: %s%n", a.toStringWithDomains());
 		
 		// Abstracts G0 and L0
 		BDDVarSet abs = getG0VarSet().union(getLocalVarSet());
@@ -910,7 +931,7 @@ public class DomainManager extends BDDManager {
 				BDDDomain dom = doms[hDomIndex + globalcopy*(i+1) + 1];
 				arg.heap[i] = decode(DomainManager.scanVar(c, dom), dom);
 			}
-			log("arg: %s%n", arg);
+			if (debug()) log("arg: %s%n", arg);
 			args.add(arg);
 			c.free();
 		}

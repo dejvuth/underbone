@@ -69,9 +69,15 @@ public class DomainSemiring implements Semiring {
 		this.manager = manager;
 		this.bdd = bdd;
 		manager.updateMaxNodeNum();
+//		if (bdd.nodeCount() > max) {
+//			max = bdd.nodeCount();
+//			System.out.println(max);
+//		}
 //		if (Sat.debug())
 //			log("\t\t\tbdd.nodeCount():%d%n", bdd.nodeCount());
 	}
+	
+//	static int max = 0;
 	
 	/**
 	 * Disjuncts this BDD with the BDD of <code>a</code>.
@@ -476,13 +482,91 @@ public class DomainSemiring implements Semiring {
 		return new DomainSemiring(manager, d);
 	}
 	
+	private DomainSemiring arrayload(ExprSemiring A) {
+		// Gets the current value of stack pointer (sp)
+		BDDDomain spdom = manager.getStackPointerDomain();
+		int sp = (int) DomainManager.scanVar(bdd, spdom);
+		
+		// Gets the stack domains
+		BDDDomain[] sdoms = new BDDDomain[2];
+		sdoms[0] = manager.getStackDomain(sp - 1);	// index
+		sdoms[1] = manager.getStackDomain(sp - 2);	// arrayref
+		BDDDomain tdom = manager.getTempVarDomain();
+		
+		BDDFactory factory = bdd.getFactory();
+		BDD c = factory.zero();
+		
+		BDDIterator sitr = manager.iterator(bdd, sdoms);
+		while (sitr.hasNext()) {
+			
+			// Gets an s1 value
+			BDD e = sitr.nextBDD();
+			long s1 = DomainManager.scanVar(e, sdoms[1]);
+			if (s1 == 0) {
+				if (debug()) log("\t\tNullPointerException%n");
+				continue;
+			}
+			
+			// Gets an s0 value
+			int s0 = DomainManager.decode(DomainManager.scanVar(e, sdoms[0]), sdoms[0]);
+			if (debug()) log("\t\ts1: %d, s0: %d%n", s1, s0);
+			if (s0 < 0) {
+				log("\t\tArray bound violation: index %d%n", s0);
+				System.err.printf("Array bound violation: index %d%n", s0);
+				continue;
+			}
+			
+			BDD f = bdd.id().andWith(e);
+			BDDDomain[] hdoms = new BDDDomain[2];
+			hdoms[0] = manager.getArrayLengthDomain(s1);
+			hdoms[1] = manager.getArrayElementDomain(s1, s0);
+			
+			BDDIterator hitr = manager.iterator(f, hdoms);
+			while (hitr.hasNext()) {
+				
+				BDD g = hitr.nextBDD();
+				long l = DomainManager.scanVar(g, hdoms[0]);				
+				
+				// Checks array bound
+				if (s0 >= l) {
+					if (debug())
+						log("\t\tArray bound violation: length %d, index %d%n", l, s0);
+					System.err.printf("Array bound violation: length %d, index %d%n", l, s0);
+					continue;
+				}
+				
+				long h = DomainManager.scanVar(g, hdoms[1]);
+				c.orWith(f.id().andWith(g).andWith(manager.ithVar(tdom, h)));
+			}
+			f.free();
+		}
+		
+		// Abstract stack
+		Category category = (Category) A.value;
+		BDDVarSet abs = factory.makeSet(sdoms);//s0dom.set().unionWith(s1dom.set());
+		if (category.one())
+			abs.unionWith(spdom.set());
+		BDD d = c.exist(abs);
+		c.free();
+		abs.free();
+		
+		// Update stack
+		d.replaceWith(factory.makePair(tdom, sdoms[1]));
+		if (category.one())
+			d.andWith(manager.ithVar(spdom, sp - 1));
+		else // category 2
+			d.andWith(manager.ithVar(sdoms[0], 0));
+		
+		return new DomainSemiring(manager, d);
+	}
+	
 	/**
 	 * Pushes from heap: s0 = heap[s1+s0+1], sp=sp-1;
 	 * 
 	 * @param A
 	 * @return
 	 */
-	private DomainSemiring arrayload(ExprSemiring A) {
+	private DomainSemiring arrayloadx(ExprSemiring A) {
 		
 		// Gets the current value of stack pointer (sp)
 		BDDDomain spdom = manager.getStackPointerDomain();
@@ -515,7 +599,7 @@ public class DomainSemiring implements Semiring {
 				BDD f = s0itr.nextBDD();
 				int s0 = DomainManager.decode(DomainManager.scanVar(f, s0dom), s0dom);
 				f.free();
-				log("\t\ts1: %d, s0: %d%n", s1, s0);
+				if (debug()) log("\t\ts1: %d, s0: %d%n", s1, s0);
 				if (s0 < 0) {
 					log("\t\tArray bound violation: index %d%n", s0);
 					System.err.printf("Array bound violation: index %d%n", s0);
@@ -582,13 +666,95 @@ public class DomainSemiring implements Semiring {
 		return new DomainSemiring(manager, d);
 	}
 	
+	private DomainSemiring arraystore(ExprSemiring A) {
+
+		// Gets the current value of stack pointer (sp)
+		BDDDomain spdom = manager.getStackPointerDomain();
+		int sp = (int) DomainManager.scanVar(bdd, spdom);	
+		
+		// Gets the stack domains
+		int category = ((Category) A.value).intValue();
+		BDDDomain[] sdoms = new BDDDomain[3];
+		sdoms[0] = manager.getStackDomain(sp - category);
+		sdoms[1] = manager.getStackDomain(sp - category - 1);
+		sdoms[2] = manager.getStackDomain(sp - category - 2);
+		
+		BDDFactory factory = bdd.getFactory();
+		BDD c = factory.zero();
+		
+		BDDIterator sitr = manager.iterator(bdd, sdoms);
+		while (sitr.hasNext()) {
+			BDD d = sitr.nextBDD();
+			
+			// Gets an s2 value
+			long s2 = DomainManager.scanVar(d, sdoms[2]);
+			if (s2 == 0) {
+				if (debug()) log("\t\tNullPointerException%n");
+				System.err.printf("\t\tNullPointerException%n");
+				continue;
+			}
+			
+			// Gets an s1 value
+			int s1 = DomainManager.decode(DomainManager.scanVar(d, sdoms[1]), sdoms[1]);
+			if (s1 < 0) {
+				if (debug()) log("\t\tArrayIndexOutOfBoundException: index %d%n", s1);
+				System.err.printf("\t\tArrayIndexOutOfBoundException: index %d%n", s1);
+				continue;
+			}
+			BDDDomain hdom = manager.getArrayElementDomain(s2, s1);
+			
+			// Gets an s0 value
+			long s0 = DomainManager.scanVar(d, sdoms[0]);
+			if (debug()) log("\t\ts2: %d, s1: %d, s0: %d%n", s2, s1, s0);
+			
+			BDD e = bdd.id().andWith(d);
+			BDDDomain ldom = manager.getArrayLengthDomain(s2);
+			BDDIterator litr = manager.iterator(e, ldom);
+			while (litr.hasNext()) {
+				
+				// Gets a length value
+				BDD f = litr.nextBDD();
+				int l = (int) DomainManager.scanVar(f, ldom);
+				
+				// Check array bound
+				if (s1 >= l) {
+					if (debug()) 
+						log("\t\tArrayIndexOutOfBoundException: length %d, index %d%n", l, s1);
+					System.err.printf("ArrayIndexOutOfBoundException: length %d, index %d%n", l, s1);
+					continue;
+				}
+				
+				// Prunes the bdd at s2,s1,s0,length
+				f = e.id().andWith(f);
+				
+				// Updates the heap at the pruned bdd
+				c.orWith(f.exist(hdom.set()).andWith(manager.ithVar(hdom, s0)));
+				f.free();
+			}
+			e.free();
+		}
+		
+		// Abstracts stack
+		log("\t\tAbstracting stack%n");
+		BDDVarSet abs = factory.makeSet(sdoms).unionWith(spdom.set());
+		if (category == 2)
+			abs.unionWith(manager.getStackDomain(sp - 1).set());
+		BDD d = c.exist(abs);
+		c.free();
+		abs.free();
+		
+		// Updates stack
+		d.andWith(manager.ithVar(spdom, sp - category - 2));
+		return new DomainSemiring(manager, d);
+	}
+	
 	/**
 	 * Pops to heap: heap[s2+s1+1]=s0, sp=sp-3;
 	 * 
 	 * @param A
 	 * @return
 	 */
-	private DomainSemiring arraystore(ExprSemiring A) {
+	private DomainSemiring arraystorex(ExprSemiring A) {
 
 		// Gets the current value of stack pointer (sp)
 		BDDDomain spdom = manager.getStackPointerDomain();

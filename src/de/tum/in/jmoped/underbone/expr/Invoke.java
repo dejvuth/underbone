@@ -36,6 +36,21 @@ public class Invoke {
 		this.init = init;
 	}
 	
+	public int hashCode() {
+		int hash = 31*7 + ((isStatic) ? 1 : 0);
+		hash = 31*hash + nargs;
+		hash = 31*hash + ((init) ? 1 : 0);
+		return hash;
+	}
+	
+	public boolean equals(Object o) {
+		if (o == null) return false;
+		if (!(o instanceof Invoke)) return false;
+		
+		Invoke that = (Invoke) o;
+		return isStatic == that.isStatic && nargs == that.nargs && init == that.init;
+	}
+	
 	public String toString() {
 		StringBuilder out = new StringBuilder();
 		

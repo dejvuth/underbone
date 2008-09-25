@@ -85,7 +85,7 @@ public class PoolManager {
 		}
 		
 		bddmanager.factory.extVarNum(varnum);
-		if (BDDManager.log()) BDDManager.log(toString());
+		if (BDDManager.debug()) BDDManager.log(toString());
 	}
 	
 	private PoolManager(BDDManager bddmanager) {
