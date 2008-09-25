@@ -78,6 +78,25 @@ public class Field {
 		return name;
 	}
 	
+	public int hashCode() {
+		int hash = 31*7 + category.hashCode();
+		hash = 31*hash + id;
+		if (name != null) hash = 31*hash + name.hashCode();
+		return hash;
+	}
+	
+	public boolean equals(Object o) {
+		if (o == null) return false;
+		if (!(o instanceof Field)) return false;
+		
+		Field that = (Field) o;
+		if (!category.equals(that.category) || id != that.id)
+			return false;
+		if (name == null)
+			return that.name == null;
+		return name.equals(that.name);
+	}
+	
 	/**
 	 * Returns the string representation of this field information.
 	 * 

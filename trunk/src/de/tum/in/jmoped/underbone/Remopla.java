@@ -630,23 +630,13 @@ public class Remopla {
 		return c.manager;
 	}
 	
-//	public List<RawArgument> getRawArguments(String label) {
-//		
-//		if (post != null) {
-//		
-//			Set<Transition> trans = post.getTransitions(p, label);
-//			List<RawArgument> raws = new ArrayList<RawArgument>();
-//			for (Transition t : trans)
-//				raws.addAll(manager.getRawArguments(((BDDSemiring) post.getWeight(t)).bdd));
-//			
-//			return raws;
-//		} else if (vm != null) {
-//			
-//			return vm.getRawArguments(label);
-//		}
-//		
-//		return null;
-//	}
+	public int countRawArguments(String label) {
+		switch(coverage.mode) {
+		case BDDDOMAIN:
+			return countRawArguments(label, (BDDDomainCoverage) coverage);
+		}
+		throw new RemoplaError("Coverage mode not supported: %s", coverage.mode);
+	}
 	
 	public Collection<RawArgument> getRawArguments(String label) {
 		switch(coverage.mode) {
@@ -660,7 +650,103 @@ public class Remopla {
 		throw new RemoplaError("Unexpected coverage mode: %s", coverage.mode);
 	}
 	
-	private static List<RawArgument> getRawArguments(String label, BDDDomainCoverage coverage) {
+	/**
+	 * TODO copy of getRawArguments
+	 * 
+	 * @param label
+	 * @param coverage
+	 * @return
+	 */
+	private static int countRawArguments(
+			String label, BDDDomainCoverage coverage) {
+		Fa post = coverage.post;
+		if (post == null) return 0;
+		
+		DomainManager manager = coverage.manager;
+		Set<Transition> trans = post.getTransitions(p, label);
+		WorkSet<String> workset = new LifoWorkSet<String>();
+		HashMap<String, BDD> rels = new HashMap<String, BDD>();
+		for (Transition t : trans) {
+			workset.add(t.getToState());
+			rels.put(t.getToState(), ((DomainSemiring) post.getWeight(t)).bdd.id());
+		}
+		
+		// States that has transitions to the final state.
+		HashSet<String> toS = new HashSet<String>();
+		
+		while (!workset.isEmpty()) {
+			
+			// Removes q from workset
+			String q = workset.remove();
+			
+			// Continues if there is no transitions leaving q
+			trans = post.getTransitions(q);
+			if (trans == null) continue;
+			
+			// For all transitions leaving q
+			for (Transition t : trans) {
+				
+				if (debug()) log("t: %s%n", t);
+				String q_t = t.getToState();
+				if (q_t.equals(s)) {
+					toS.add(q);
+					continue;
+				}
+				
+				BDD bdd1 = rels.get(q);
+				BDD bdd2 = ((DomainSemiring) post.getWeight(t)).bdd;
+				BDD bdd = manager.conjoin(bdd1, bdd2);
+				if (debug()) {
+					log("bdd1: %s%n", bdd1.toStringWithDomains());
+					log("bdd2: %s%n", bdd2.toStringWithDomains());
+					log("bdd: %s%n", bdd.toStringWithDomains());
+				}
+				
+				/*
+				 * If the bdd is new, puts the state 
+				 * and the corresponding bdd into the workset.
+				 */
+				if (!rels.containsKey(q_t)) {
+					workset.add(q_t);
+					rels.put(q_t, bdd);
+					continue;
+				}
+				
+				// Ignores if the new bdd equals the existing bdd
+				BDD bdd_t = rels.get(q_t);
+				if (bdd.equals(bdd_t)) {
+					bdd.free();
+					continue;
+				}
+				
+				// Disjuncts the new bdd with the existing bdd
+				bdd = bdd_t.id().orWith(bdd);
+				
+				// Ignores if the new bdd equals the existing bdd
+				if (bdd.equals(bdd_t)) {
+					bdd.free();
+					continue;
+				}
+				
+				// Puts the state and the corresponding bdd into the workset
+				bdd_t.free();
+				workset.add(q_t);
+				rels.put(q_t, bdd);
+			}
+		}
+		
+		int count = 0;
+		for (String q : toS) 
+			count += manager.countRawArguments(rels.get(q));
+		
+		for (BDD bdd : rels.values())
+			bdd.free();
+		
+		return count;
+	}
+	
+	private static List<RawArgument> getRawArguments(
+			String label, BDDDomainCoverage coverage) {
 		Fa post = coverage.post;
 		if (post == null) return null;
 		
@@ -688,7 +774,7 @@ public class Remopla {
 			// For all transitions leaving q
 			for (Transition t : trans) {
 				
-				log("t: %s%n", t);
+				if (debug()) log("t: %s%n", t);
 				String q_t = t.getToState();
 				if (q_t.equals(s)) {
 					toS.add(q);
@@ -698,9 +784,11 @@ public class Remopla {
 				BDD bdd1 = rels.get(q);
 				BDD bdd2 = ((DomainSemiring) post.getWeight(t)).bdd;
 				BDD bdd = manager.conjoin(bdd1, bdd2);
-				log("bdd1: %s%n", bdd1.toStringWithDomains());
-				log("bdd2: %s%n", bdd2.toStringWithDomains());
-				log("bdd: %s%n", bdd.toStringWithDomains());
+				if (debug()) {
+					log("bdd1: %s%n", bdd1.toStringWithDomains());
+					log("bdd2: %s%n", bdd2.toStringWithDomains());
+					log("bdd: %s%n", bdd.toStringWithDomains());
+				}
 				
 				/*
 				 * If the bdd is new, puts the state 
@@ -737,7 +825,7 @@ public class Remopla {
 		
 		List<RawArgument> raws = new ArrayList<RawArgument>();
 		for (String q : toS) 
-			raws.addAll(manager.getRawArguments2(rels.get(q)));
+			raws.addAll(manager.getRawArguments(rels.get(q)));
 		
 		for (BDD bdd : rels.values())
 			bdd.free();
@@ -772,7 +860,7 @@ public class Remopla {
 			// For all transitions leaving q
 			for (Transition t : trans) {
 				
-				log("t: %s%n", t);
+				if (debug()) log("t: %s%n", t);
 				String q_t = t.getToState();
 				if (q_t.equals(s)) {
 					toS.add(q);
@@ -782,9 +870,11 @@ public class Remopla {
 				ExplicitSemiring rels1 = rels.get(q);
 				ExplicitSemiring rels2 = (ExplicitSemiring) post.getWeight(t);
 				ExplicitSemiring r = rels1.conjoin(rels2);
-				log("rels1: %s%n", rels1.toString());
-				log("rels2: %s%n", rels2.toString());
-				log("r: %s%n", r.toString());
+				if (debug()) {
+					log("rels1: %s%n", rels1.toString());
+					log("rels2: %s%n", rels2.toString());
+					log("r: %s%n", r.toString());
+				}
 				
 				/*
 				 * If the bdd is new, puts the state 
@@ -863,6 +953,10 @@ public class Remopla {
 	 */
 	public static void info(String msg, Object... args) {
 		log(1, msg, args);
+	}
+	
+	static boolean debug() {
+		return verbosity >= 2;
 	}
 	
 	private static void log(int threshold, String msg, Object... args) {

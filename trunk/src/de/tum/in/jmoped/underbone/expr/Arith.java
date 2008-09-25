@@ -88,6 +88,18 @@ public class Arith implements Expr {
 		throw new ExprError("Unexpected arithmetic type %d", type);
 	}
 	
+	public int hashCode() {
+		return 31*(31*7 + type) + category.hashCode();
+	}
+	
+	public boolean equals(Object o) {
+		if (o == null) return false;
+		if (!(o instanceof Arith)) return false;
+		
+		Arith that = (Arith) o;
+		return type == that.type && category.equals(that.category);
+	}
+	
 	public String toString() {
 		return String.format("%s %s", toString(type), category.toString());
 	}

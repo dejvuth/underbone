@@ -28,6 +28,18 @@ public class Inc implements Expr {
 		this.value = value;
 	}
 	
+	public int hashCode() {
+		return 31*(31*7 + index) + value;
+	}
+	
+	public boolean equals(Object o) {
+		if (o == null) return false;
+		if (!(o instanceof Inc)) return false;
+		
+		Inc that = (Inc) o;
+		return index == that.index && value == that.value;
+	}
+	
 	public String toString() {
 		return index + " by " + value;
 	}

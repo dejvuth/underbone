@@ -96,6 +96,26 @@ public class If extends Comp {
 		throw new ExprError("Unkwown comparison type");
 	}
 	
+	public int hashCode() {
+		int hash = 7;
+		hash = 31*hash + type;
+		if (value != null) hash = 31*hash + value.hashCode();
+		hash = 31*hash + high;
+		return hash;
+	}
+	
+	public boolean equals(Object o) {
+		if (o == null) return false;
+		if (!(o instanceof If)) return false;
+		
+		If that = (If) o;
+		if (type != that.type || high != that.high) return false;
+		if (value == null) {
+			return that.value == null;
+		}
+		return value.equals(that.value);
+	}
+	
 	public String toString() {
 		StringBuilder out = new StringBuilder(toString(type));
 		out.append(" ");
