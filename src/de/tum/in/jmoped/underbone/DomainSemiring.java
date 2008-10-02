@@ -535,8 +535,8 @@ public class DomainSemiring implements Semiring {
 					continue;
 				}
 				
-				long h = DomainManager.scanVar(g, hdoms[1]);
-				c.orWith(f.id().andWith(g).andWith(manager.ithVar(tdom, h)));
+				int h = DomainManager.decode(DomainManager.scanVar(g, hdoms[1]), hdoms[1]);
+				c.orWith(f.id().andWith(g).andWith(manager.ithVar(tdom, DomainManager.encode(h, sdoms[1]))));
 			}
 			f.free();
 		}
@@ -704,7 +704,7 @@ public class DomainSemiring implements Semiring {
 			BDDDomain hdom = manager.getArrayElementDomain(s2, s1);
 			
 			// Gets an s0 value
-			long s0 = DomainManager.scanVar(d, sdoms[0]);
+			int s0 = DomainManager.decode(DomainManager.scanVar(d, sdoms[0]), sdoms[0]);
 			if (debug()) log("\t\ts2: %d, s1: %d, s0: %d%n", s2, s1, s0);
 			
 			BDD e = bdd.id().andWith(d);
@@ -728,7 +728,7 @@ public class DomainSemiring implements Semiring {
 				f = e.id().andWith(f);
 				
 				// Updates the heap at the pruned bdd
-				c.orWith(f.exist(hdom.set()).andWith(manager.ithVar(hdom, s0)));
+				c.orWith(f.exist(hdom.set()).andWith(manager.ithVar(hdom, DomainManager.encode(s0, hdom))));
 				f.free();
 			}
 			e.free();
@@ -1036,11 +1036,13 @@ public class DomainSemiring implements Semiring {
 				
 				// Saves field value to temp and conjuncts with s0 and h
 				e = hitr.nextBDD();
-				long h = DomainManager.scanVar(e, hdom);
-				e.free();
+				int h = DomainManager.decode(DomainManager.scanVar(e, hdom), hdom);
+//				e.free();
 				
-				BDD z = d.id().andWith(manager.ithVar(hdom, h))
-						.andWith(manager.ithVar(tdom, h));
+				
+//				BDD z = d.id().andWith(manager.ithVar(hdom, h))
+				BDD z = d.id().andWith(e)
+						.andWith(manager.ithVar(tdom, DomainManager.encode(h, s0dom)));
 				c.orWith(z);
 //				log("\t\tPush %d%n", h);
 			}
@@ -1127,17 +1129,18 @@ public class DomainSemiring implements Semiring {
 				
 				// Gets a value
 				e = vitr.nextBDD();
-				long v = DomainManager.scanVar(e, vdom);
+				int v = DomainManager.decode(DomainManager.scanVar(e, vdom), vdom);
 				if (debug())
 					log("\t\tref: %d, value:%d%n", manager.decodeHeapIndex(r), v);
-				e.free();
+//				e.free();
 				
 				// Prunes the bdd to only for s0 and s1
-				e = d.id().andWith(manager.ithVar(vdom, v));
+//				e = d.id().andWith(manager.ithVar(vdom, v));
+				e = d.id().andWith(e);
 				
 				// Abstracts the heap domain of the pruned bdd and updates to s0
 				c.orWith(e.exist(hdom.set())
-						.andWith(manager.ithVar(hdom, v)));
+						.andWith(manager.ithVar(hdom, DomainManager.encode(v, hdom))));
 				e.free();
 			}
 			d.free();
