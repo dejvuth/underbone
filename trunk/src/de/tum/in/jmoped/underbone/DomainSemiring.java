@@ -1872,16 +1872,18 @@ public class DomainSemiring implements Semiring {
 			d = bdd.id().andWith(manager.ithVar(hpdom, hp));
 			BDDVarSet abs = hdom.set().unionWith(s0dom.set());
 			
-			logRaw(d.exist(abs));
-			logRaw(d.exist(abs)
-					.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id))));
-			logRaw(d.exist(abs)
-					.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id)))
-					.andWith(manager.ithVar(s0dom, hp)));
-			logRaw(d.exist(abs)
-					.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id)))
-					.andWith(manager.ithVar(s0dom, hp))
-					.andWith(manager.ithVar(tdom, manager.encodeHeapIndex(dechp + n.size + 1))));
+			if (all()) {
+				logRaw(d.exist(abs));
+				logRaw(d.exist(abs)
+						.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id))));
+				logRaw(d.exist(abs)
+						.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id)))
+						.andWith(manager.ithVar(s0dom, hp)));
+				logRaw(d.exist(abs)
+						.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id)))
+						.andWith(manager.ithVar(s0dom, hp))
+						.andWith(manager.ithVar(tdom, manager.encodeHeapIndex(dechp + n.size + 1))));
+			}
 			
 			c.orWith(d.exist(abs)
 					.andWith(manager.ithVar(hdom, manager.encodeObjectId(n.id)))
@@ -2256,7 +2258,7 @@ public class DomainSemiring implements Semiring {
 	private DomainSemiring returnExpr(ExprSemiring A) {
 		BDD c;
 		Return ret = (Return) A.value;
-		if (ret.type == Return.Type.VOID) {
+		if (ret.type == Return.VOID) {
 			/*
 			 *  Abstracts locals and the return var (the return var might be
 			 *  set here if this is in fact an exception throwing).
@@ -2825,6 +2827,10 @@ public class DomainSemiring implements Semiring {
 	
 	private static boolean debug() {
 		return Sat.debug();
+	}
+	
+	private static boolean all() {
+		return Sat.all();
 	}
 	
 	public static void log(String msg, Object... args) {

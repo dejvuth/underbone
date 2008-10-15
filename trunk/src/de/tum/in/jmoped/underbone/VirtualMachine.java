@@ -814,7 +814,7 @@ public class VirtualMachine {
 				
 				case ExprType.RETURN: {
 					Return ret = (Return) d.value;
-					if (ret.type == Return.Type.SOMETHING) {
+					if (ret.type == Return.SOMETHING) {
 						retvar = frame.stack.pop();
 						if (ret.getCategory().two())
 							retvar = frame.stack.pop();
