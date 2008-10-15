@@ -10,42 +10,45 @@ import java.util.Set;
  */
 public class Return {
 	
-	public Return.Type type;
-	private Object value;
+	public static final int VOID = 0;
+	public static final int SOMETHING = 1;
 	
-	public Return(Return.Type type) {
+	public int type;
+	private Category category;
+	
+	public Return(int type) {
 		this(type, null);
 	}
 	
-	public Return(Return.Type type, Object value) {
+	public Return(int type, Category category) {
 		this.type = type;
-		this.value = value;
+		this.category = category;
 	}
 	
 	public Category getCategory() {
-		return (Category) value;
+		return category;
 	}
 	
 	public String toString() {
-		if (type == Type.VOID) return "void";
-		return getCategory().toString();
+		if (type == VOID) return "void";
+		return category.toString();
 	}
 	
-	public static enum Type {
-		VOID, SOMETHING;
-	}
+//	public static enum Type {
+//		VOID, SOMETHING;
+//	}
 	
-	public static class ThrowInfo {
-		Set<Integer> set;
-		String var;
-		
-		public ThrowInfo(Set<Integer> set, String var) {
-			this.set = set;
-			this.var = var;
-		}
-		
-		public String toString() {
-			return String.format("set: %s var: %s", set, var);
-		}
-	}
+//	public static class ThrowInfo {
+//		Set<Integer> set;
+//		String var;
+//		
+//		public ThrowInfo(Set<Integer> set, String var) {
+//			this.set = set;
+//			this.var = var;
+//		}
+//		
+//		public String toString() {
+//			return String.format("set: %s var: %s", set, var);
+//		}
+//	}
 }

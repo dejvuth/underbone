@@ -43,17 +43,10 @@ public class Module {
 	 */
 	private String name;
 	
+	/**
+	 * Number of arguments
+	 */
 	private int nargs;
-	
-//	/**
-//	 * True iff long or double. Length determines the number of parameters.
-//	 */
-//	private boolean[] params;
-	
-//	/**
-//	 * True if the method does not return a value.
-//	 */
-//	private boolean isVoid;
 	
 	/**
 	 * Stack depth
@@ -75,17 +68,13 @@ public class Module {
 	 * 
 	 * @param name the name of the module.
 	 * @param params the parameters.
-	 * @param isVoid determines whether the module is void.
 	 * @param sdepth the operand stack depth.
 	 * @param lvnum the number of local variables.
 	 */
-	public Module (String name, int nargs, //boolean[] params, //boolean isVoid, 
-			int sdepth, int lvnum) {
+	public Module (String name, int nargs, int sdepth, int lvnum) {
 		
 		this.name = name;
 		this.nargs = nargs;
-//		this.params = params;
-//		this.isVoid = isVoid;
 		this.sdepth = sdepth;
 		this.lvnum = lvnum;
 	}
@@ -1226,9 +1215,9 @@ public class Module {
 	
 	private static String returnexpr(ExprSemiring d) {
 		Return r = (Return) d.value;
-		if (r.type == Return.Type.VOID)
+		if (r.type == Return.VOID)
 			return "return;";
-		else // if (r.type == ExprSemiring.Return.Type.SOMETHING)
+		else // if (r.type == Return.SOMETHING)
 			return String.format("%s = %s[%s - %d]; return;", 
 					ret, stack, sptr, r.getCategory().intValue());
 	}

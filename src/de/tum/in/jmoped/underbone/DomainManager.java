@@ -1272,17 +1272,18 @@ public class DomainManager extends BDDManager {
 	private BDDDomain[][] domains;
 	
 	private BDDDomain[] putGxDomain(int type, int x) {
-		if (domains == null) 
+		if (cache && domains == null) 
 			domains = new BDDDomain[DOM_NUM][];
 		
-		if (domains[type] != null)
+		if (cache && domains[type] != null)
 			return domains[type];
 		
 		BDDDomain[] d = new BDDDomain[gnum];
 		for (int i = 0; i < gnum; i++)
 			d[i] = doms[g0 + globalcopy*i + gindex[x]];
 		
-		domains[type] = d;
+		if (cache)
+			domains[type] = d;
 		return d;
 	}
 	
@@ -1299,10 +1300,10 @@ public class DomainManager extends BDDManager {
 	}
 	
 	private BDDDomain[] putGxLxDomain(int type, int x) {
-		if (domains == null) 
+		if (cache && domains == null) 
 			domains = new BDDDomain[DOM_NUM][];
 		
-		if (domains[type] != null)
+		if (cache && domains[type] != null)
 			return domains[type];
 		
 		BDDDomain[] d = new BDDDomain[gnum + lvmax];
@@ -1312,7 +1313,8 @@ public class DomainManager extends BDDManager {
 		for (int i = 0; i < lvmax; i++)
 			d[j++] = doms[l0 + varcopy*i + x];
 		
-		domains[type] = d;
+		if (cache) 
+			domains[type] = d;
 		return d;
 	}
 	
@@ -1352,11 +1354,12 @@ public class DomainManager extends BDDManager {
 	 * @return the variable set.
 	 */
 	private BDDVarSet putVarSet(int type, BDDDomain[] d) {
-		if (varsets == null)
+		if (cache && varsets == null)
 			varsets = new BDDVarSet[VARSET_NUM];
 		
 		BDDVarSet vs = factory.makeSet(d);
-		varsets[type] = vs;
+		if (cache)
+			varsets[type] = vs;
 		return vs;
 	}
 	
@@ -1553,12 +1556,13 @@ public class DomainManager extends BDDManager {
 	private BDDPairing[] pairings;
 	
 	private BDDPairing putPairing(int type, BDDDomain[] d1, BDDDomain[] d2) {
-		if (pairings == null)
+		if (cache && pairings == null)
 			pairings = new BDDPairing[PAIR_NUM];
 		
 		BDDPairing p = factory.makePair();
 		p.set(d1, d2);
-		pairings[type] = p;
+		if (cache)
+			pairings[type] = p;
 		return p;
 	}
 	

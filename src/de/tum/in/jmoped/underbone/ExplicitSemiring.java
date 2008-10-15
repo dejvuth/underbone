@@ -1054,7 +1054,7 @@ public class ExplicitSemiring implements Semiring {
 		HashSet<ExplicitRelation> newrels = new HashSet<ExplicitRelation>();
 		for (ExplicitRelation rel : rels) {
 			G newg = (G) rel.g().id();
-			if (ret.type != Return.Type.VOID) {
+			if (ret.type != Return.VOID) {
 				newg.setGlobal(ExplicitRelation.RETVAR, 
 						rel.stack(rel.sptr() - ret.getCategory().intValue()));
 			}
